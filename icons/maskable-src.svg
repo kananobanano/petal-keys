@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8fe0c8"/>
+      <stop offset="0.55" stop-color="#a9d4f5"/>
+      <stop offset="1" stop-color="#c3b3f3"/>
+    </linearGradient>
+    <linearGradient id="keys" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#efe9f7"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#e57ea4"/>
+      <stop offset="1" stop-color="#f9c6d8"/>
+    </linearGradient>
+    <clipPath id="body"><rect x="96" y="176" width="320" height="216" rx="34"/></clipPath>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g transform="translate(64 64) scale(0.75)">
+  <circle cx="150" cy="128" r="150" fill="#ffffff" opacity="0.16"/>
+  <g clip-path="url(#body)">
+    <rect x="96" y="176" width="320" height="216" fill="url(#keys)"/>
+    <rect x="96" y="176" width="320" height="16" fill="#e58fae"/>
+    <path d="M203 192v200M309 192v200" stroke="#ddd4ec" stroke-width="6"/>
+    <rect x="174" y="176" width="58" height="134" rx="14" fill="#3a3452"/>
+    <rect x="280" y="176" width="58" height="134" rx="14" fill="#3a3452"/>
+  </g>
+  <path d="M352 168c6-46 52-86 112-78-6 60-52 96-112 78z" fill="url(#leaf)"/>
+  <path d="M356 164c22-24 52-44 92-58" stroke="#fff3f8" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.8"/>
+  <path d="M136 94l11 27 27 11-27 11-11 27-11-27-27-11 27-11z" fill="#ffffff"/>
+  <circle cx="190" cy="86" r="7" fill="#ffffff" opacity="0.85"/>
+</g>
+</svg>

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Staff test</title>
+<link rel="stylesheet" href="../css/fonts.css">
+<style>
+  body { font-family: 'MK Body', sans-serif; background: #fffdf9; color: #3a3452; margin: 16px; }
+  .box { border: 1px solid #ddd; margin: 10px 0; width: var(--w, 380px); }
+  .staff-svg { display: block; color: #3a3452; }
+  .staff-svg .sl, .staff-svg .ledger, .staff-svg .bar { stroke: #9a92b4; }
+  .staff-svg .stem { stroke: currentColor; }
+  .staff-svg .mus { fill: currentColor; }
+  .staff-svg .beam { fill: currentColor; }
+  .staff-svg .st-good { color: #2e9c80; }
+  .staff-svg .st-bad { color: #c2457a; }
+  .staff-svg .ghost { color: #c2457a; opacity: .55; }
+  .staff-svg .judge { font: 700 11px 'MK Body'; fill: #7d68c2; }
+  .staff-svg .note-name { font: 700 11px 'MK Body'; fill: #7d68c2; }
+  .staff-svg .playhead { stroke: #7fd1b9; }
+  h3 { margin: 18px 0 4px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div id="out"></div>
+<script type="module">
+import { renderStaff, singleScore, rowScore } from '../js/core/staff.js';
+import { parseNote as N, notes } from '../js/core/music.js';
+const out = document.getElementById('out');
+await document.fonts.load('20px "MK Bravura"');
+function show(title, score, opts = {}, w = 380) {
+  out.insertAdjacentHTML('beforeend', `<h3>${title} (${w}px)</h3>`);
+  const box = document.createElement('div');
+  box.className = 'box';
+  box.style.setProperty('--w', w + 'px');
+  out.append(box);
+  const lay = renderStaff(box, score, { width: w, ...opts });
+  return lay;
+}
+const ev = (id, beat, dur, ...ns) => ({ id, beat, dur, notes: ns.map(N), rest: ns.length === 0 });
+const passage = {
+  clef: 'treble', time: [4, 4],
+  measures: [
+    { events: [ev('a', 0, 1, 'C4'), ev('b', 1, 1, 'D4'), ev('c', 2, 0.5, 'F#4'), ev('d', 2.5, 0.5, 'G4'), ev('e', 3, 1, 'F4')] },
+    { events: [ev('f', 0, 1.5, 'A5'), ev('g', 1.5, 0.5, 'C6'), ev('h', 2, 1), ev('i', 3, 1, 'B4')] },
+  ],
+};
+const lay = show('treble passage, accidental carry, beams, dotted, rest, ledger', passage, {
+  states: { a: 'good', b: 'bad' }, judgements: { a: { label: 'Perfect', cls: 'perfect' }, e: { label: 'Late', cls: 'late' } },
+  ghosts: [{ absBeat: 1, note: N('Eb4'), cls: 'extra' }],
+}, 380);
+lay.setPlayhead(2.25);
+show('same passage wide', passage, {}, 760);
+show('same passage narrow (wraps)', passage, {}, 300);
+show('bass passage', { clef: 'bass', time: [4, 4], measures: [
+  { events: [ev('a', 0, 2, 'C3'), ev('b', 2, 1, 'E2'), ev('c', 3, 1, 'C4')] },
+  { events: [ev('d', 0, 4, 'G2')] },
+  { events: [ev('e', 0, 4)] },
+] }, { noteNames: true });
+show('chords with seconds, accidentals', { clef: 'treble', time: [4, 4], measures: [
+  { events: [ev('a', 0, 1, 'C4', 'D4', 'G4'), ev('b', 1, 1, 'F4', 'G4', 'B4'), ev('c', 2, 2, 'C5', 'D5', 'F5'), ] },
+  { events: [ev('d', 0, 4, 'F#4', 'A4', 'C#5')] },
+] });
+show('single note (flash card)', singleScore([N('G5')], 'treble'), { free: true, extent: { treble: [-4, 12] } }, 260);
+show('free play grand staff', rowScore([[N('C4')], [N('E3'), N('G3'), N('C4')], [N('A5')], [N('C2')], [N('F#4'), N('A4')], [N('Bb3')]], 'grand'), { free: true, noteNames: true }, 380);
+show('eighth runs both directions', { clef: 'treble', time: [4, 4], measures: [
+  { events: [ev('a', 0, 0.5, 'C4'), ev('b', 0.5, 0.5, 'E4'), ev('c', 1, 0.5, 'G5'), ev('d', 1.5, 0.5, 'E5'), ev('e', 2, 0.5, 'B4'), ev('f', 2.5, 0.5, 'C5'), ev('g', 3, 0.5, 'A4'), ev('h', 3.5, 0.5)] },
+] }, {}, 380);
+document.body.dataset.done = '1';
+</script>
+</body>
+</html>
