@@ -1045,3 +1045,29 @@ body.in-exercise .toasts { top: calc(64px + env(safe-area-inset-top, 0px)); bott
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }
+
+/* ---------- songs ---------- */
+.songs { margin-top: 22px; }
+.songs-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.songs-head .section-title { margin: 0; }
+.add-song { min-height: 40px; padding: 8px 16px; cursor: pointer; }
+.songs-empty { margin: 0; padding: 14px 16px; border-radius: 18px; border: 1.5px dashed var(--line); }
+.song-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.song-row { display: flex; align-items: center; gap: 4px; padding-right: 4px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); }
+.song-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 0; background: transparent; color: var(--ink); text-align: left; cursor: pointer; border-radius: 18px; }
+.song-ico { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center; background: var(--pink-soft); color: var(--pink-ink); }
+.song-text { display: grid; gap: 2px; min-width: 0; }
+.song-title { font: 500 17px/1.25 var(--font-display); overflow-wrap: anywhere; }
+.song-sub { font-size: 13px; color: var(--ink-2); }
+.song-more .ico svg { width: 18px; height: 18px; }
+.drills-title { margin-top: 24px; }
+.prompt-block.song { max-width: 900px; gap: 10px; }
+.song-tools { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; }
+.song-tools .select { max-width: 100%; font-weight: 700; font-size: 14px; }
+.seg-small .seg-btn { min-height: 36px; padding: 6px 13px; font-size: 13.5px; }
+.song-card { max-height: clamp(170px, 34vh, 520px); overflow-y: auto; overscroll-behavior: contain; }
+.staff-svg .tie { fill: currentColor; color: var(--note-ink); }
+.staff-svg .tie.st-good { color: var(--mint-ink); }
+.staff-svg .bar-num { font: 700 10px var(--font-body); fill: var(--ink-3); }
+.staff-svg .st-active { color: var(--lav-ink); }
+@media (min-width: 700px) { .song-card { max-height: min(50vh, 560px); } }

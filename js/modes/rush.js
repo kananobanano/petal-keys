@@ -7,6 +7,8 @@ import { parseNote, spell, noteLabel, midiOf } from '../core/music.js';
 import { renderStaff, staffPos } from '../core/staff.js';
 import { generatePassage, scoreAttempt, matchWindow, judgeTiming } from '../core/rushlogic.js';
 import { button, clefKey, rangeOf, poolExtent, matchesNote } from './common.js';
+import { songPassage } from '../core/songs.js';
+import { toast } from '../ui/overlay.js';
 
 export function createRush(ctx, cfg) {
   const { store, kb, audio } = ctx;
@@ -36,6 +38,7 @@ export function createRush(ctx, cfg) {
   let live = new Map();
   let lastDraw = {};
   let listenTimer = 0;
+  let warnedNoSong = false;
 
   // ----- DOM -----
   const staffEl = h('div', { class: 'staff-inner' });
@@ -60,22 +63,33 @@ export function createRush(ctx, cfg) {
   function draw(extra = {}) {
     lastDraw = extra;
     const w = Math.max(240, staffEl.clientWidth || staffCard.clientWidth - 24 || 320);
-    layout = renderStaff(staffEl, { clef, time: [4, 4], measures: passage.measures }, {
+    layout = renderStaff(staffEl, { clef, time: passage.time || [4, 4], key: passage.key || 0, measures: passage.measures }, {
       width: w,
       maxSpace: 14,
       minSpace: 11,
       wrapSpace: 11,
       extent: { [clef]: extent },
-      label: `Note Rush: ${passage.notes.map((n) => noteLabel(n.note)).join(', ')}`,
+      label: `Note Rush: ${passage.notes.map((n) => noteLabel(n.note || spell(n.midi))).join(', ')}`,
       judgements: extra.judgements || {},
       ...extra,
     });
   }
 
   function newPassage() {
-    passage = generatePassage({ pool, bars, level, weightOf: (n) => store.weight(keyOf(midiOf(n))) });
+    passage = null;
+    if (cfg.source === 'songs') {
+      passage = songPassage({ clef, bars });
+      if (!passage && !warnedNoSong) {
+        warnedNoSong = true;
+        toast('No song has a fitting line on this staff yet, so here is a new one.');
+      }
+    }
+    if (!passage) passage = generatePassage({ pool, bars, level, weightOf: (n) => store.weight(keyOf(midiOf(n))) });
+    for (const n of passage.notes) n.ev = n.ev || n.id;
+    if (passage.range) kb.focus(passage.range[0], passage.range[1]);
     attempt = 0;
     toStudy();
+    if (passage.from) ctx.feedback(`From “${passage.from}”. Take your time, then tap Go.`, 'info');
   }
 
   function toStudy() {
@@ -108,7 +122,7 @@ export function createRush(ctx, cfg) {
       for (let i = 0; i < passage.beats; i++) audio.click(tStart + i * beatSec, false);
     }
     startPerf = audio.perfTimeOf(tStart);
-    expected = passage.notes.map((n) => ({ id: n.id, midi: n.midi, t: startPerf + n.absBeat * msPerBeat + calib }));
+    expected = passage.notes.map((n) => ({ id: n.id, ev: n.ev, midi: n.midi, t: startPerf + n.absBeat * msPerBeat + calib }));
     ctx.app.debug = { rush: { passage, startPerf, msPerBeat, calib, expected } }; // handy for testing
     win = matchWindow(passage.notes, msPerBeat);
     const lastNote = passage.notes[passage.notes.length - 1];
@@ -176,9 +190,11 @@ export function createRush(ctx, cfg) {
     });
     const states = {};
     const judgements = {};
-    res.results.forEach((r) => {
-      states[r.id] = r.hit ? 'good' : 'miss';
-      if (r.hit) judgements[r.id] = { label: r.label, cls: r.cls };
+    res.results.forEach((r, i) => {
+      const ev = expected[i].ev;
+      if (!r.hit) states[ev] = 'miss';
+      else if (states[ev] !== 'miss') states[ev] = 'good';
+      if (r.hit && !judgements[ev]) judgements[ev] = { label: r.label, cls: r.cls };
     });
     draw({ states, judgements, ghosts });
 
@@ -292,9 +308,9 @@ export function createRush(ctx, cfg) {
         const j = judgeTiming(best.dt);
         live.set(best.ex.id, j);
         const states = {};
-        for (const id of live.keys()) states[id] = 'good';
+        for (const id of live.keys()) states[expected.find((x) => x.id === id).ev] = 'good';
         draw({ states });
-        popJudge(j, best.ex.id);
+        popJudge(j, best.ex.ev);
       } else {
         kb.mark(e.midi, 'bad', 250);
       }

@@ -8,6 +8,7 @@ import { createHigherLower } from './higherlower.js';
 import { createFindNote } from './findnote.js';
 import { createFreePlay } from './freeplay.js';
 import { createCalibrate } from './calibrate.js';
+import { createSong } from './song.js';
 
 export const MODES = {
   name: createName,
@@ -18,4 +19,5 @@ export const MODES = {
   find: createFindNote,
   free: createFreePlay,
   calib: createCalibrate,
+  song: createSong,
 };

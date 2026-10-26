@@ -3,7 +3,9 @@
 
 import { h } from '../core/util.js';
 import { icon } from './icons.js';
-import { sheet } from './overlay.js';
+import { sheet, toast, confirmSheet } from './overlay.js';
+import { listSongs, addSong, removeSong, sections } from '../core/songs.js';
+import { readSongFile } from '../core/musicxml.js';
 import { noteLabel, midiOf, chordSymbol } from '../core/music.js';
 import { RHYTHM_LEVELS } from '../core/rushlogic.js';
 import { readingPool, rhythmLevel, chordPool, namePool, findLevel, FIND_LEVELS } from '../lessons.js';
@@ -96,6 +98,9 @@ export function renderPractice(app, root) {
           seg('Staff', [{ v: 'treble', label: 'Treble' }, { v: 'bass', label: 'Bass' }], g('rushClef', 'treble'), (v) => { opts.rushClef = v; }),
           seg('Rhythms', Object.entries(RHYTHM_LEVELS).filter(([k]) => Number(k) <= Math.max(rl, 1)).map(([k, v]) => ({ v: Number(k), label: v.name })), Math.min(g('rushLevel', rl), rl), (v) => { opts.rushLevel = v; }),
           seg('Line length', [{ v: 1, label: '1 bar' }, { v: 2, label: '2 bars' }], g('rushBars', 1), (v) => { opts.rushBars = v; }),
+          listSongs().length
+            ? seg('Lines from', [{ v: 'new', label: 'New lines' }, { v: 'songs', label: 'My songs' }], g('rushSource', 'new'), (v) => { opts.rushSource = v; })
+            : null,
           h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Tempo'),
             h('div', { class: 'stepper' },
               h('button', { class: 'btn btn-round', type: 'button', 'aria-label': 'Slower', onclick: () => setT(-5) }, '−'),
@@ -105,7 +110,7 @@ export function renderPractice(app, root) {
       },
       go: () => {
         const clef = g('rushClef', 'treble');
-        start('Note Rush', [{ type: 'rush', clef, pool: clef === 'bass' ? bassP : trebleP, level: Math.min(g('rushLevel', rl), rl), bars: g('rushBars', 1), tempo: store.settings.rushTempo || 60, count: 4 }]);
+        start('Note Rush', [{ type: 'rush', clef, pool: clef === 'bass' ? bassP : trebleP, level: Math.min(g('rushLevel', rl), rl), bars: g('rushBars', 1), tempo: store.settings.rushTempo || 60, count: 4, source: g('rushSource', 'new') }]);
       },
     },
     {
@@ -179,6 +184,68 @@ export function renderPractice(app, root) {
       h('h1', { class: 'page-title' }, 'Practice'),
       h('p', { class: 'page-sub' }, 'Only things you have already learned. Nothing new, no pressure.')),
     mix,
+    songsSection(app),
+    h('h2', { class: 'section-title drills-title' }, 'Drills'),
     grid,
   );
+}
+
+// ---------- songs ----------
+
+const KEY_NAMES = { '-7': 'C♭', '-6': 'G♭', '-5': 'D♭', '-4': 'A♭', '-3': 'E♭', '-2': 'B♭', '-1': 'F', 0: 'C', 1: 'G', 2: 'D', 3: 'A', 4: 'E', 5: 'B', 6: 'F♯', 7: 'C♯' };
+
+function songsSection(app) {
+  const { store } = app;
+  const songs = listSongs();
+  const fileIn = h('input', { type: 'file', id: 'song-file', class: 'visually-hidden', accept: '.musicxml,.xml,.mxl,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml,text/xml,application/xml' });
+  fileIn.onchange = async () => {
+    const f = fileIn.files && fileIn.files[0];
+    fileIn.value = '';
+    if (!f) return;
+    if (f.size > 8_000_000) {
+      toast('That file is too big for a song score.', { kind: 'bad' });
+      return;
+    }
+    try {
+      const song = await readSongFile(f);
+      const entry = addSong(song);
+      const bars = song.measures.length;
+      toast(`Added “${song.title}”: ${bars} bar${bars === 1 ? '' : 's'}.`, { kind: 'good', ms: 3600 });
+      app.refresh();
+      setTimeout(() => document.querySelector(`[data-song="${entry.id}"]`)?.focus(), 50);
+    } catch (e) {
+      toast(e.message || "That file couldn't be read.", { kind: 'bad', ms: 5200 });
+    }
+  };
+  const add = h('label', { class: 'btn btn-ghost add-song', for: 'song-file' }, icon('upload'), h('span', {}, 'Add song'));
+
+  const list = h('ul', { class: 'song-list' });
+  for (const { id, song } of songs) {
+    const bars = song.measures.length;
+    const hands = song.staves.length > 1 ? 'both hands' : song.staves[0] === 'bass' ? 'bass clef' : 'one staff';
+    const bests = sections(song).map((_, i) => ['wait', 'play'].map((m) => ['right', 'left', 'both'].map((hd) => store.best(`song:${id}:${i}:${hd}:${m}`)))).flat(3).filter((v) => v != null);
+    const best = bests.length ? Math.max(...bests) : null;
+    const startIt = () => app.startSession({ title: song.title, kind: 'practice', steps: [{ type: 'song', songId: id, count: 1 }] });
+    list.append(h('li', { class: 'song-row' },
+      h('button', { class: 'song-main', type: 'button', dataset: { song: id }, onclick: startIt },
+        h('span', { class: 'song-ico' }, icon('rush')),
+        h('span', { class: 'song-text' },
+          h('span', { class: 'song-title' }, song.title),
+          h('span', { class: 'song-sub' }, `${bars} bar${bars === 1 ? '' : 's'} · key of ${KEY_NAMES[song.key] || 'C'} · ${hands}${best != null ? ` · best ${best}` : ''}`))),
+      h('button', { class: 'icon-btn song-more', type: 'button', 'aria-label': `Remove ${song.title}`, onclick: async () => {
+        const ok = await confirmSheet({ title: `Remove “${song.title}”?`, body: 'It is removed from this device. You can add the file again any time.', ok: 'Remove', danger: true });
+        if (ok) {
+          removeSong(id);
+          app.refresh();
+        }
+      } }, icon('close'))));
+  }
+
+  return h('section', { class: 'songs' },
+    h('header', { class: 'songs-head' },
+      h('h2', { class: 'section-title' }, 'Songs'),
+      add, fileIn),
+    songs.length
+      ? list
+      : h('p', { class: 'muted small songs-empty' }, 'Add a MusicXML file (.musicxml or .mxl) to learn a song a few bars at a time. MuseScore can export one.'));
 }

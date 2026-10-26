@@ -14,6 +14,13 @@ Read music, build chords and train your ears, one short lesson at a time.
   right notes and a separate score for timing (Perfect / Great / Good).
 - **Find the note**: hear C, then a mystery note. Press keys freely to search,
   then submit the one that sounds right.
+- **Songs**: add a MusicXML file and learn it a few bars at a time.
+  **Wait** mode waits on each note until you play it (with key hints);
+  **Play along** gives a count-in and scores notes and timing. Choose a part
+  (about 4 bars), the hand (for two-staff piano music) and the tempo.
+  Note Rush can also take its lines from your songs ("Lines from: My songs").
+- **Instruments**: grand piano, electric piano, music box, marimba, organ,
+  soft synth or dreamy pad (Me → Settings, or the picker in Free play).
 - **Progress** saves by itself, with a streak that forgives one rest day a week.
   A tiny backup file (a few hundred characters) moves it between devices.
 
@@ -66,6 +73,22 @@ and `Z` / `X` change the octave.
 - **Save code** gives the same backup as text you can copy and paste.
 - The app reminds you gently if your last backup is more than a week old.
 
+## Adding songs
+
+1. Get a MusicXML file: `.musicxml`, `.xml` or compressed `.mxl`
+   (MuseScore: File → Export → MusicXML).
+2. On the phone, send it with LocalSend, then in Petal Keys go to
+   **Practice → Songs → Add song** and pick it from Downloads.
+3. Tap the song. Pick a part, a hand and Wait or Play along.
+
+Songs are stored on the device you added them on. They are not part of the
+backup file (to keep it tiny), so add the file on each device; your best
+scores for songs do travel with backups.
+
+Supported: treble and bass staves (up to two), key signatures, ties, dotted
+notes, eighths and sixteenths, chords, pickup bars. Grace notes are skipped.
+Triplets play correctly but are drawn with plain note shapes.
+
 ## Small keyboards (25 keys)
 
 **Any octave counts** is on by default, so the right note in another octave is
@@ -89,7 +112,8 @@ css/fonts.css         embedded fonts (UI fonts + music symbols)
 js/main.js            start-up, tabs, input wiring
 js/lessons.js         the lesson path (edit or add lessons here)
 js/core/              music theory, sound, MIDI, on-screen keyboard,
-                      sheet-music renderer, save files, Note Rush scoring
+                      sheet-music renderer, save files, Note Rush scoring,
+                      MusicXML reader (musicxml.js) and song library (songs.js)
 js/modes/             one file per drill
 js/ui/                Learn, Practice and Me pages, sessions, sheets
 assets/piano/         piano samples
@@ -105,9 +129,9 @@ tools/                tests and the build helper
 
 ## Ideas for later
 
-From the plan: importing songs (MusicXML, and MIDI with a MIDI → MusicXML
-converter for bar alignment), Song Mode with a Wait Mode, Note Rush lines taken
-from songs you know, rhythm practice, little theory cards, and PDF import.
+From the plan: MIDI import (with a MIDI → MusicXML style converter that
+snaps timing and finds the bars), rhythm practice, little theory cards, and
+PDF import.
 
 ## Credits
 

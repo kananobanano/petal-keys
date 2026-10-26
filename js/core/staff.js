@@ -13,15 +13,15 @@ const G = {
   gClef: '', fClef: '', brace: '',
   whole: '', half: '', black: '',
   flat: '', natural: '', sharp: '',
-  restW: '', restH: '', restQ: '', rest8: '',
-  flag8Up: '', flag8Down: '', dot: '',
+  restW: '', restH: '', restQ: '', rest8: '', rest16: '',
+  flag8Up: '', flag8Down: '', flag16Up: '', flag16Down: '', dot: '',
 };
 const tsGlyph = (d) => String(d).split('').map((c) => String.fromCharCode(0xe080 + Number(c))).join('');
 
 // Glyph widths in staff spaces (measured from Bravura).
 const W = {
   head: 1.18, whole: 1.688, sharp: 0.996, flat: 0.904, natural: 0.672,
-  gClef: 2.684, fClef: 2.736, ts: 1.88, restQ: 1.08, restW: 1.13, restH: 1.13, rest8: 1.0,
+  gClef: 2.684, fClef: 2.736, ts: 1.88, restQ: 1.08, restW: 1.13, restH: 1.13, rest8: 1.0, rest16: 1.28,
   flag: 1.06, stem: 0.12, staffLine: 0.13, ledger: 0.16, ledgerExt: 0.4, beam: 0.5,
 };
 
@@ -41,7 +41,7 @@ export function clefFor(notes) {
 }
 
 const ADV = (dur) => 1.75 + 2.45 * Math.sqrt(dur);
-const isDotted = (dur) => [3, 1.5, 0.75].includes(dur);
+const isDotted = (dur) => [3, 1.5, 0.75, 0.375].some((d) => Math.abs(dur - d) < 1e-6);
 const baseDur = (dur) => (isDotted(dur) ? dur / 1.5 : dur);
 const headGlyph = (dur) => (dur >= 4 ? G.whole : dur >= 2 ? G.half : G.black);
 const headWidth = (dur) => (dur >= 4 ? W.whole : W.head);
@@ -51,7 +51,22 @@ function restGlyph(dur) {
   if (b >= 4) return [G.restW, W.restW];
   if (b >= 2) return [G.restH, W.restH];
   if (b >= 1) return [G.restQ, W.restQ];
-  return [G.rest8, W.rest8];
+  if (b >= 0.5) return [G.rest8, W.rest8];
+  return [G.rest16, W.rest16];
+}
+
+// Key signatures: staff positions on the treble staff (bass is 2 lower).
+const SHARP_POS = [8, 5, 9, 6, 3, 7, 4];
+const FLAT_POS = [4, 7, 3, 6, 2, 5, 1];
+const SHARP_ORDER = 'FCGDAEB';
+const FLAT_ORDER = 'BEADGCF';
+
+/** Accidental of each letter in a key, e.g. fifths 1 -> { F: 1 }. */
+export function keyAccidentals(fifths = 0) {
+  const out = {};
+  if (fifths > 0) for (let i = 0; i < Math.min(7, fifths); i++) out[SHARP_ORDER[i]] = 1;
+  if (fifths < 0) for (let i = 0; i < Math.min(7, -fifths); i++) out[FLAT_ORDER[i]] = -1;
+  return out;
 }
 
 function defaultStemDir(part) {
@@ -85,7 +100,9 @@ function defaultStemDir(part) {
  */
 export function renderStaff(target, score, opts = {}) {
   const width = Math.max(120, opts.width || target.clientWidth || 360);
-  const staves = score.clef === 'grand' ? ['treble', 'bass'] : [score.clef || 'treble'];
+  const staves = score.staves || (score.clef === 'grand' ? ['treble', 'bass'] : [score.clef || 'treble']);
+  const fifths = Math.max(-7, Math.min(7, score.key || 0));
+  const keyAcc = keyAccidentals(fifths);
   const free = !!opts.free;
   const time = free ? null : score.time || null;
   const beatsPerBar = time ? time[0] * (4 / time[1]) : 4;
@@ -96,19 +113,28 @@ export function renderStaff(target, score, opts = {}) {
   const noteStates = opts.noteStates || {};
 
   // ---------- prepare events ----------
+  let startAcc = 0;
   const measures = (score.measures || []).map((m, mi) => {
-    const start = mi * beatsPerBar;
+    const start = startAcc;
+    const len = m.beats || beatsPerBar;
+    startAcc += len;
     const events = m.events.map((ev) => {
       const parts = staves.map(() => []);
       (ev.notes || []).forEach((n, i) => {
         let si = 0;
-        if (staves.length > 1) si = n.staff ? staves.indexOf(n.staff) : midiOf(n) >= 60 ? 0 : 1;
+        if (n.si != null) si = Math.min(staves.length - 1, n.si);
+        else if (staves.length > 1) si = n.staff ? staves.indexOf(n.staff) : midiOf(n) >= 60 ? 0 : 1;
         parts[si].push({ n, i, p: staffPos(n, staves[si]), acc: null, dx: 0 });
       });
-      parts.forEach((pt) => pt.sort((a, b) => a.p - b.p));
-      return { ...ev, parts, absBeat: start + (ev.beat || 0), rest: !!ev.rest || !(ev.notes || []).length };
+      parts.forEach((pt) => {
+        pt.sort((a, b) => a.p - b.p);
+        const withDur = pt.find((x) => x.n.dur != null);
+        pt.dur = withDur ? withDur.n.dur : ev.dur;
+      });
+      const rest = !!ev.rest || !(ev.notes || []).length;
+      return { ...ev, parts, absBeat: start + (ev.beat || 0), rest, restSi: ev.si || 0 };
     });
-    return { index: mi, start, events };
+    return { index: mi, start, len, events, label: m.label };
   });
 
   // Accidentals: carry through the bar (key of C), or show all in free mode.
@@ -119,7 +145,7 @@ export function renderStaff(target, score, opts = {}) {
         if (free) state[si].clear();
         for (const x of part) {
           const key = x.n.letter + x.n.octave;
-          const cur = state[si].has(key) ? state[si].get(key) : 0;
+          const cur = state[si].has(key) ? state[si].get(key) : free ? 0 : keyAcc[x.n.letter] || 0;
           if (x.n.acc !== cur) x.acc = x.n.acc === 1 ? 'sharp' : x.n.acc === -1 ? 'flat' : 'natural';
           state[si].set(key, x.n.acc);
         }
@@ -137,7 +163,7 @@ export function renderStaff(target, score, opts = {}) {
         group = [];
       };
       for (const ev of m.events) {
-        const eighth = !ev.rest && baseDur(ev.dur) === 0.5 && !isDotted(ev.dur);
+        const eighth = !ev.rest && baseDur(ev.dur) <= 0.5 && !isDotted(ev.dur) && ev.parts[0].length > 0;
         if (eighth && (!group.length || Math.floor(group[0].beat + 1e-6) === Math.floor(ev.beat + 1e-6))) {
           group.push(ev);
         } else {
@@ -175,7 +201,7 @@ export function renderStaff(target, score, opts = {}) {
       } else {
         for (let i = part.length - 2; i >= 0; i--) if (part[i + 1].p - part[i].p === 1 && part[i + 1].dx === 0) part[i].dx = -1;
       }
-      const hw = headWidth(ev.dur);
+      const hw = headWidth(part.dur);
       const anyLeft = part.some((x) => x.dx < 0);
       const anyRight = part.some((x) => x.dx > 0);
       // accidental columns, top note first
@@ -200,8 +226,8 @@ export function renderStaff(target, score, opts = {}) {
       });
       ev.leftExt = Math.max(ev.leftExt, withAcc.length ? off : anyLeft ? hw : 0);
       let right = hw * (anyRight ? 2 : 1);
-      if (isDotted(ev.dur)) right += 0.9;
-      if (!ev.beam && baseDur(ev.dur) <= 0.5 && dir === 'up') right += 0.85;
+      if (isDotted(part.dur)) right += 0.9;
+      if (!ev.beam && baseDur(part.dur) <= 0.5 && dir === 'up') right += 0.85;
       ev.rightExt = Math.max(ev.rightExt, right);
     });
   }
@@ -241,22 +267,23 @@ export function renderStaff(target, score, opts = {}) {
   const pad = staves.length > 1 ? 1.9 : 0.6;
   const clefW = 0.5 + Math.max(...staves.map((c) => CLEFS[c].width)) + 0.9;
   const tsW = time ? W.ts + 0.9 : 0;
+  const keyW = fifths ? Math.abs(fifths) * 1.02 + 0.5 : 0;
   const endPad = 0.5;
 
   // ---------- systems (lines) ----------
   let systems;
-  const totalNat = pad + clefW + tsW + measures.reduce((s, m) => s + m.width, 0) + endPad;
+  const totalNat = pad + clefW + keyW + tsW + measures.reduce((s, m) => s + m.width, 0) + endPad;
   if (free || measures.length <= 1 || width / totalNat >= minSpace) {
     systems = [{ measures: measures.slice(), first: true }];
   } else {
     systems = [];
     let cur = [];
-    let curW = pad + clefW + tsW;
+    let curW = pad + clefW + keyW + tsW;
     for (const m of measures) {
       if (cur.length && (curW + m.width + endPad) * wrapSpace > width) {
         systems.push({ measures: cur, first: systems.length === 0 });
         cur = [];
-        curW = pad + clefW;
+        curW = pad + clefW + keyW;
       }
       cur.push(m);
       curW += m.width;
@@ -265,7 +292,7 @@ export function renderStaff(target, score, opts = {}) {
   }
   let sp = maxSpace;
   for (const sys of systems) {
-    sys.header = pad + clefW + (sys.first ? tsW : 0);
+    sys.header = pad + clefW + keyW + (sys.first ? tsW : 0);
     sys.natural = sys.header + sys.measures.reduce((s, m) => s + m.width, 0) + endPad;
     sp = Math.min(sp, width / sys.natural);
   }
@@ -276,7 +303,9 @@ export function renderStaff(target, score, opts = {}) {
   for (const sys of systems) {
     const natContent = sys.measures.reduce((s, m) => s + m.width, 0);
     const avail = contentW - sys.header - endPad;
-    const f = free || opts.noStretch ? 1 : Math.max(1, avail / natContent);
+    let f = free || opts.noStretch ? 1 : Math.max(1, avail / natContent);
+    // a short last line keeps its natural spacing instead of stretching thin
+    if (!free && systems.length > 1 && sys === systems[systems.length - 1]) f = Math.min(f, 1.35);
     const origin = sys.measures[0] ? sys.measures[0].xStart : 0;
     for (const m of sys.measures) {
       const ms = m.xStart;
@@ -285,7 +314,7 @@ export function renderStaff(target, score, opts = {}) {
       for (const ev of m.events) {
         ev.x = sys.header + (ev.headLeft - origin) * f;
         // A lone whole rest sits in the middle of its bar.
-        if (ev.rest && m.events.length === 1 && baseDur(ev.dur) >= beatsPerBar - 1e-6) {
+        if (ev.rest && m.events.length === 1 && ev.dur >= m.len - 1e-6) {
           ev.x = (m.sx + m.ex) / 2 - W.restW / 2;
         }
       }
@@ -317,11 +346,12 @@ export function renderStaff(target, score, opts = {}) {
       if (!part.length) return;
       const lo = part[0].p;
       const hi = part[part.length - 1].p;
-      if (ev.dur >= 4) {
+      if (part.dur >= 4) {
         part.tipP = null;
         return;
       }
-      part.tipP = part.dir === 'up' ? Math.max(hi + 7, 4) : Math.min(lo - 7, 4);
+      const extra = baseDur(part.dur) <= 0.25 ? 1 : 0;
+      part.tipP = part.dir === 'up' ? Math.max(hi + 7 + extra, 4) : Math.min(lo - 7 - extra, 4);
     });
   }
   // Beams: straight line between the first and last stem tips, gentle slope.
@@ -407,6 +437,9 @@ export function renderStaff(target, score, opts = {}) {
     svg('line', { x1: P(x1), y1: P(y1), x2: P(x2), y2: P(y2), 'stroke-width': Math.max(1, +(w * sp).toFixed(2)), class: cls });
 
   const anchors = []; // per system [{beat, x}]
+  const sysY = [];
+  const heads = new Map(); // "eventId:noteIndex" -> { x, y, sys, k, dir, hw }
+  const order = [];
   const playheads = [];
   const eventX = {};
 
@@ -415,7 +448,8 @@ export function renderStaff(target, score, opts = {}) {
     const staffTops = staves.map((_, k) => y0 + top + k * (4 + staffGap));
     const Y = (k, p) => staffTops[k] + (8 - p) / 2;
     const left = pad;
-    const right = contentW - endPad;
+    const lastM = sys.measures[sys.measures.length - 1];
+    const right = !free && lastM ? Math.min(contentW - endPad, lastM.ex) : contentW - endPad;
     const g = svg('g', { class: 'system' });
     music.append(g);
 
@@ -436,9 +470,20 @@ export function renderStaff(target, score, opts = {}) {
     staves.forEach((clef, k) => {
       g.append(text(CLEFS[clef].glyph, left + 0.5, Y(k, CLEFS[clef].glyphP), 'mus clef'));
     });
+    // key signature
+    if (fifths) {
+      staves.forEach((clef, k) => {
+        const pos = fifths > 0 ? SHARP_POS : FLAT_POS;
+        const shift = clef === 'bass' ? -2 : 0;
+        for (let i = 0; i < Math.abs(fifths); i++) {
+          g.append(text(fifths > 0 ? G.sharp : G.flat, left + clefW + i * 1.02, Y(k, pos[i] + shift), 'mus acc key'));
+        }
+      });
+    }
+    sysY.push({ Y, left, right, header: sys.header });
     // time signature
     if (sys.first && time) {
-      const tx = left + clefW;
+      const tx = left + clefW + keyW;
       staves.forEach((_, k) => {
         g.append(text(tsGlyph(time[0]), tx, Y(k, 6), 'mus ts'));
         g.append(text(tsGlyph(time[1]), tx, Y(k, 2), 'mus ts'));
@@ -450,8 +495,10 @@ export function renderStaff(target, score, opts = {}) {
 
     sys.measures.forEach((m, mi) => {
       for (const ev of m.events) {
-        const hw = ev.rest ? 0 : headWidth(ev.dur);
-        const cx = ev.x + (ev.rest ? restGlyph(ev.dur)[1] / 2 : hw / 2);
+        const firstPart = ev.parts.find((pt) => pt.length);
+        const hw0 = ev.rest || !firstPart ? 0 : headWidth(firstPart.dur);
+        const cx = ev.x + (ev.rest ? restGlyph(ev.dur)[1] / 2 : hw0 / 2);
+        order.push(ev);
         eventX[ev.id] = cx;
         sysAnchors.push({ beat: ev.absBeat, x: cx });
         const state = states[ev.id];
@@ -460,7 +507,7 @@ export function renderStaff(target, score, opts = {}) {
 
         if (ev.rest) {
           const [glyph] = restGlyph(ev.dur);
-          const k = 0;
+          const k = Math.min(staves.length - 1, ev.restSi || 0);
           const p = baseDur(ev.dur) >= 4 ? 6 : 4;
           eg.append(text(glyph, ev.x, Y(k, p), 'mus rest'));
           if (isDotted(ev.dur)) eg.append(text(G.dot, ev.x + restGlyph(ev.dur)[1] + 0.3, Y(k, 5)));
@@ -478,6 +525,7 @@ export function renderStaff(target, score, opts = {}) {
         ev.parts.forEach((part, k) => {
           if (!part.length) return;
           const dir = part.dir;
+          const hw = headWidth(part.dur);
           // ledger lines
           const hiP = part[part.length - 1].p;
           const loP = part[0].p;
@@ -502,8 +550,9 @@ export function renderStaff(target, score, opts = {}) {
             const hx = ev.x + x.dx * hw;
             const hy = Y(k, x.p);
             if (x.acc) ng.append(text(G[x.acc], ev.x + x.accX, hy, 'mus acc'));
-            ng.append(text(headGlyph(ev.dur), hx, hy, 'mus head'));
-            if (isDotted(ev.dur)) {
+            ng.append(text(headGlyph(part.dur), hx, hy, 'mus head'));
+            heads.set(`${ev.id}:${x.i}`, { x: hx, y: hy, sys: si, k, dir, hw, ev, n: x.n });
+            if (isDotted(part.dur)) {
               const dp = x.p % 2 === 0 ? x.p + 1 : x.p;
               const dx = ev.x + hw * (part.some((q) => q.dx > 0) ? 2 : 1) + 0.3;
               ng.append(text(G.dot, dx, Y(k, dp), 'mus dot'));
@@ -516,9 +565,11 @@ export function renderStaff(target, score, opts = {}) {
             const y1 = Y(k, startP) + (dir === 'up' ? -0.168 : 0.168);
             const y2 = Y(k, part.tipP);
             eg.append(line(stemX, y1, stemX, y2, W.stem, 'stem'));
-            if (!ev.beam && baseDur(ev.dur) <= 0.5) {
+            if (!ev.beam && baseDur(part.dur) <= 0.5) {
               const fx = stemX - W.stem / 2;
-              eg.append(text(dir === 'up' ? G.flag8Up : G.flag8Down, fx, y2, 'mus flag'));
+              const six = baseDur(part.dur) <= 0.25;
+              const glyph = dir === 'up' ? (six ? G.flag16Up : G.flag8Up) : six ? G.flag16Down : G.flag8Down;
+              eg.append(text(glyph, fx, y2, 'mus flag'));
             }
           }
         });
@@ -537,7 +588,10 @@ export function renderStaff(target, score, opts = {}) {
         });
         if (staves.length > 1) g.append(line(m.ex, staffTops[0] + 4, m.ex, staffTops[1], 0.16, 'bar'));
       }
-      sysAnchors.push({ beat: m.start + beatsPerBar, x: isLastBar ? m.ex - 1.2 : m.ex });
+      sysAnchors.push({ beat: m.start + m.len, x: isLastBar ? m.ex - 1.2 : m.ex });
+      if (opts.barNumbers && m.label != null && mi === 0 && si > 0) {
+        g.append(svg('text', { x: P(m.sx + 0.2), y: P(staffTops[0] - 1.6), class: 'bar-num' }, String(m.label)));
+      }
     });
 
     // beams for this system
@@ -555,6 +609,37 @@ export function renderStaff(target, score, opts = {}) {
         class: 'beam' + st,
         points: `${P(x1)},${P(y1)} ${P(x2)},${P(y2)} ${P(x2)},${P(y2 + t)} ${P(x1)},${P(y1 + t)}`,
       }));
+      // second beam for sixteenths
+      const slopeY = (y2 - y1) / Math.max(1e-6, L.x2 - L.x1);
+      const yAt = (x) => y1 + (x - L.x1) * slopeY + (L.dir === 'up' ? 0.75 : -0.75);
+      const sx = (ev) => ev.stemX;
+      const is16 = (ev) => baseDur(ev.dur) <= 0.25;
+      bm.forEach((ev, i) => {
+        if (!is16(ev)) return;
+        const next = bm[i + 1];
+        const prev = bm[i - 1];
+        let a = null;
+        let b = null;
+        if (next && is16(next)) {
+          a = sx(ev);
+          b = sx(next);
+        } else if (!(prev && is16(prev))) {
+          if (next) {
+            a = sx(ev);
+            b = sx(ev) + 1.1;
+          } else {
+            a = sx(ev) - 1.1;
+            b = sx(ev);
+          }
+        }
+        if (a == null) return;
+        const ya = yAt(a);
+        const yb = yAt(b);
+        g.append(svg('polygon', {
+          class: 'beam' + st,
+          points: `${P(a - W.stem / 2)},${P(ya)} ${P(b + W.stem / 2)},${P(yb)} ${P(b + W.stem / 2)},${P(yb + t)} ${P(a - W.stem / 2)},${P(ya + t)}`,
+        }));
+      });
     }
 
     // judgement labels
@@ -590,11 +675,48 @@ export function renderStaff(target, score, opts = {}) {
     }
   });
 
+  // ties: a curve from each tied note to the same pitch in the next event
+  const evIndex = new Map(order.map((ev, i) => [ev, i]));
+  for (const h1 of heads.values()) {
+    if (!h1.n.tieStart) continue;
+    let h2 = null;
+    for (let j = evIndex.get(h1.ev) + 1; j < order.length && !h2; j++) {
+      const ev2 = order[j];
+      if (ev2.absBeat <= h1.ev.absBeat) continue;
+      for (const cand of heads.values()) {
+        if (cand.ev === ev2 && cand.k === h1.k && midiOf(cand.n) === midiOf(h1.n)) {
+          h2 = cand;
+          break;
+        }
+      }
+      if (ev2.absBeat > h1.ev.absBeat + 8) break;
+    }
+    const below = h1.dir === 'up';
+    const drawTie = (gEl, xa, xb, y) => {
+      const span = Math.max(0.6, xb - xa);
+      const hgt = Math.min(1.2, 0.35 + span * 0.08) * (below ? 1 : -1);
+      const yy = y + (below ? 0.55 : -0.55);
+      const th = 0.16 * (below ? 1 : -1);
+      const d = `M${P(xa)} ${P(yy)} C${P(xa + span * 0.3)} ${P(yy + hgt)} ${P(xb - span * 0.3)} ${P(yy + hgt)} ${P(xb)} ${P(yy)} ` +
+        `C${P(xb - span * 0.3)} ${P(yy + hgt + th)} ${P(xa + span * 0.3)} ${P(yy + hgt + th)} ${P(xa)} ${P(yy)}Z`;
+      const st = states[h1.ev.id];
+      gEl.append(svg('path', { d, class: 'tie' + (st ? ' st-' + st : '') }));
+    };
+    const gSys = music.children;
+    if (h2 && h2.sys === h1.sys) {
+      drawTie(gSys[h1.sys], h1.x + h1.hw * 0.75, h2.x + h2.hw * 0.25, h1.y);
+    } else {
+      const s1 = sysY[h1.sys];
+      drawTie(gSys[h1.sys], h1.x + h1.hw * 0.75, s1.right - 0.3, h1.y);
+      if (h2) drawTie(gSys[h2.sys], sysY[h2.sys].header - 0.6, h2.x + h2.hw * 0.25, h2.y);
+    }
+  }
+
   function systemOfBeat(beat) {
     for (let i = 0; i < systems.length; i++) {
       const ms = systems[i].measures;
       if (!ms.length) continue;
-      const end = ms[ms.length - 1].start + beatsPerBar;
+      const end = ms[ms.length - 1].start + ms[ms.length - 1].len;
       if (beat < end - 1e-9 || i === systems.length - 1) return i;
     }
     return 0;
@@ -621,6 +743,10 @@ export function renderStaff(target, score, opts = {}) {
     sp,
     width: contentW * sp,
     height: totalH * sp,
+    systemTop(si) {
+      return si * (sysHeight + sysGap) * sp;
+    },
+    systemHeight: sysHeight * sp,
     eventX: Object.fromEntries(Object.entries(eventX).map(([k, v]) => [k, v * sp])),
     beatToX(beat) {
       const si = systemOfBeat(beat);
