@@ -3,7 +3,9 @@
 //   Play along - count-in, the line moves at your tempo, scored like Note Rush.
 
 import { h, clear } from '../core/util.js';
-import { spell, noteLabel } from '../core/music.js';
+import { spell, noteLabel, midiLabel } from '../core/music.js';
+import { sheet, toast } from '../ui/overlay.js';
+import { icon } from '../ui/icons.js';
 import { renderStaff } from '../core/staff.js';
 import { getSong, buildView, sections, matches } from '../core/songs.js';
 import { scoreAttempt, matchWindow } from '../core/rushlogic.js';
@@ -24,7 +26,7 @@ export function createSong(ctx, cfg) {
   const secs = sections(song);
   const two = song.staves.length > 1;
   const prefKey = `song:${entry.id}`;
-  const pref = { sec: secs.length > 1 ? 1 : 0, hand: 'right', mode: 'wait', hints: true, tempo: null, ...(store.getLocal(prefKey) || {}) };
+  const pref = { sec: secs.length > 1 ? 1 : 0, hand: 'right', mode: 'wait', hints: true, names: false, tempo: null, ...(store.getLocal(prefKey) || {}) };
   if (pref.sec >= secs.length) pref.sec = 0;
   const savePref = () => store.setLocal(prefKey, pref);
   const defaultTempo = Math.max(40, Math.min(120, Math.round(((song.tempo || 100) * 0.6) / 5) * 5));
@@ -48,6 +50,7 @@ export function createSong(ctx, cfg) {
   let runs = 0;
   let lastStates = {};
   let lastExtra = {};
+  let hintStep = -1;
 
   // ----- DOM -----
   const staffEl = h('div', { class: 'staff-inner' });
@@ -71,15 +74,25 @@ export function createSong(ctx, cfg) {
     modeSeg.append(b);
     return b;
   });
+  const toggle = (id, label, key, after) => h('label', { class: 'switch-row' },
+    h('input', { type: 'checkbox', id, checked: pref[key], onchange: (e) => { pref[key] = e.target.checked; savePref(); after(); } }),
+    h('span', { class: 'switch', 'aria-hidden': 'true' }), h('span', {}, label));
+  const restartKeyBtn = h('button', { class: 'chip chip-btn', type: 'button', onclick: () => setupRestartKey() }, icon('replay'), h('span', { class: 'chip-text' }));
+  const paintRestartKey = () => {
+    const t = store.getLocal('restartTrigger');
+    restartKeyBtn.querySelector('.chip-text').textContent = t ? `Restart: ${triggerName(t)}` : 'Set restart button';
+  };
+  paintRestartKey();
   const toolbar = h('div', { class: 'song-tools' }, secSel, handSel, modeSeg);
+  const toggles = h('div', { class: 'song-tools song-toggles' },
+    toggle('song-hints', 'Key hints', 'hints', () => { paintHints(); waitFeedback(); }),
+    toggle('song-names', 'Note names', 'names', () => draw()),
+    restartKeyBtn);
   const tempoVal = h('span', { class: 'tempo-val' });
   const tempoCtl = h('div', { class: 'tempo', role: 'group', 'aria-label': 'Tempo' },
     h('button', { class: 'btn btn-round', type: 'button', 'aria-label': 'Slower', onclick: () => setTempo(pref.tempo - 5) }, '−'),
     h('span', { class: 'tempo-lbl' }, h('span', { class: 'q' }, '♩'), ' = ', tempoVal),
     h('button', { class: 'btn btn-round', type: 'button', 'aria-label': 'Faster', onclick: () => setTempo(pref.tempo + 5) }, '+'));
-  const hintsBox = h('label', { class: 'switch-row' },
-    h('input', { type: 'checkbox', id: 'song-hints', checked: pref.hints, onchange: (e) => { pref.hints = e.target.checked; savePref(); paintHints(); } }),
-    h('span', { class: 'switch', 'aria-hidden': 'true' }), h('span', {}, 'Key hints'));
 
   function setTempo(v) {
     pref.tempo = Math.max(30, Math.min(200, v));
@@ -95,7 +108,7 @@ export function createSong(ctx, cfg) {
     lastExtra = extra;
     const w = Math.max(260, staffEl.clientWidth || card.clientWidth - 24 || 320);
     layout = renderStaff(staffEl, view.score, {
-      width: w, maxSpace: 12, minSpace: 9.5, wrapSpace: 10, barNumbers: true, states, label: song.title, ...extra,
+      width: w, maxSpace: 12, minSpace: 9.5, wrapSpace: 10, barNumbers: true, noteNames: pref.names, states, label: song.title, ...extra,
     });
   }
 
@@ -123,10 +136,14 @@ export function createSong(ctx, cfg) {
 
   function paintHints() {
     kb.clearMarks('hint');
-    if (phase !== 'wait' || !pref.hints) return;
-    const step = view.steps[stepIdx];
-    if (!step) return;
-    for (const n of step.notes) if (!hit.has(n.key)) kb.mark(n.midi, 'hint');
+    if (!pref.hints || !view) return;
+    if (phase === 'wait') {
+      const step = view.steps[stepIdx];
+      if (step) for (const n of step.notes) if (!hit.has(n.key)) kb.mark(n.midi, 'hint');
+    } else if (phase === 'idle' || phase === 'countin' || phase === 'play') {
+      const step = view.steps[Math.max(0, hintStep)];
+      if (step) for (const n of step.notes) kb.mark(n.midi, 'hint');
+    }
   }
 
   function showStep() {
@@ -140,6 +157,12 @@ export function createSong(ctx, cfg) {
     const hi = Math.max(...step.notes.map((n) => n.midi));
     if (lo < kb.from || hi > kb.to) kb.focus(Math.min(lo, view.range[0]), Math.max(hi, view.range[1]));
     paintHints();
+    waitFeedback();
+  }
+
+  function waitFeedback() {
+    const step = view.steps[stepIdx];
+    if (phase !== 'wait' || !step) return;
     const names = step.notes.map((n) => noteLabel(spell(n.midi), { octave: false }));
     if (!pref.hints) ctx.feedback(`Note ${stepIdx + 1} of ${view.steps.length}`, 'info');
     else ctx.feedback(step.notes.length > 1 ? `Hold together: ${names.join(' · ')}` : `Next: ${names[0]}`, 'info');
@@ -150,7 +173,7 @@ export function createSong(ctx, cfg) {
     stepIdx = 0;
     firstTry = 0;
     summary.hidden = true;
-    ctx.setActions(hintsBox, button('Listen', { kind: 'ghost', ico: 'listen', onclick: () => listen() }), button('Restart', { kind: 'ghost', ico: 'replay', onclick: () => startWait() }));
+    ctx.setActions(button('Listen', { kind: 'ghost', ico: 'listen', onclick: () => listen() }), button('Restart', { kind: 'ghost', ico: 'replay', onclick: () => restart() }));
     if (!view.steps.length) {
       ctx.feedback('No notes for this hand in this part. Try another part or hand.', 'hint');
       draw({}, {});
@@ -196,6 +219,8 @@ export function createSong(ctx, cfg) {
     const go = button('Go', { kind: 'primary', ico: 'play', onclick: () => go_(), disabled: !view.steps.length });
     ctx.setActions(tempoCtl, go);
     kb.focus(view.range[0], view.range[1]);
+    hintStep = 0;
+    paintHints();
   }
 
   function go_() {
@@ -224,9 +249,14 @@ export function createSong(ctx, cfg) {
     draw({}, {});
     card.scrollTo({ top: 0 });
     ctx.feedback('Listen to the count-in…', 'info');
-    ctx.setActions(button('Stop', { kind: 'ghost', onclick: () => { cancelAnimationFrame(raf); audio.releaseAll(); startPlayIdle(); } }));
+    ctx.setActions(
+      button('Stop', { kind: 'ghost', onclick: () => { cancelAnimationFrame(raf); audio.releaseAll(); startPlayIdle(); } }),
+      button('Restart', { kind: 'ghost', ico: 'replay', onclick: () => restart() }),
+    );
     cancelAnimationFrame(raf);
     let lastSys = -1;
+    hintStep = 0;
+    paintHints();
     const tick = () => {
       if (!ctx.isOpen() || (phase !== 'countin' && phase !== 'play')) return;
       const beat = (performance.now() - startPerf) / msPerBeat;
@@ -241,6 +271,13 @@ export function createSong(ctx, cfg) {
           lastSys = sys;
           scrollToBeat(beat);
         }
+      }
+      // light up the next note to play (it moves on just after each note is due)
+      let next = view.steps.findIndex((st) => st.beat > beat - 0.15);
+      if (next < 0) next = view.steps.length;
+      if (next !== hintStep) {
+        hintStep = next;
+        paintHints();
       }
       if (beat >= view.length + win / msPerBeat + 0.2) {
         finishPlay();
@@ -279,7 +316,7 @@ export function createSong(ctx, cfg) {
       layout.setPlayhead(null);
     }
     const key = `song:${entry.id}:${pref.sec}:${pref.hand}:${pref.mode}`;
-    const isBest = store.setBest(key, score);
+    const isBest = store.setBest(key, score) && score > 0;
     const xp = Math.max(2, Math.round(view.steps.length / 4));
     if (runs === 1) {
       ctx.record({ correct: score >= 80, xp });
@@ -303,7 +340,7 @@ export function createSong(ctx, cfg) {
     const msg = score >= 90 ? 'Beautiful! Ready to try it faster, or the next part?' : score >= 70 ? 'Lovely! One more time makes it stick.' : 'Nice effort. Go again slowly, it gets easier each time.';
     ctx.feedback(msg, score >= 70 ? 'good' : 'hint');
     const nextSec = pref.sec > 0 && pref.sec < secs.length - 1;
-    const acts = [button('Again', { kind: 'ghost', ico: 'replay', onclick: () => reset() })];
+    const acts = [button('Again', { kind: 'ghost', ico: 'replay', onclick: () => restart() })];
     if (nextSec) acts.push(button('Next part', { kind: 'ghost', onclick: () => { pref.sec++; secSel.value = String(pref.sec); savePref(); reset(); } }));
     if (pref.mode === 'wait' && score >= 70) acts.push(button('Play along', { kind: 'ghost', onclick: () => { pref.mode = 'play'; modeBtns.forEach((b, i) => b.setAttribute('aria-checked', String(i === 1))); savePref(); reset(); } }));
     acts.push(button('Done', { kind: 'primary', onclick: () => ctx.done() }));
@@ -346,6 +383,57 @@ export function createSong(ctx, cfg) {
     raf = requestAnimationFrame(step);
   }
 
+  // ----- quick restart -----
+
+  /** Start the current part again straight away (button, R key, or your restart button). */
+  function restart() {
+    cancelAnimationFrame(raf);
+    audio.releaseAll();
+    kb.clearMarks();
+    summary.hidden = true;
+    if (!view || !view.steps.length) {
+      reset();
+      return;
+    }
+    if (pref.mode === 'wait') startWait();
+    else go_();
+  }
+
+  function triggerName(t) {
+    if (t.type === 'note') return t.ch === 9 ? `pad ${t.num}` : `key ${midiLabel(t.num)}`;
+    if (t.type === 'cc') return `button ${t.num}`;
+    return `program ${t.num}`;
+  }
+
+  function setupRestartKey() {
+    const midi = ctx.app.midi;
+    const status = h('p', { class: 'learn-status', 'aria-live': 'polite' });
+    const cur = store.getLocal('restartTrigger');
+    let close = null;
+    const listen_ = () => {
+      if (midi.status !== 'connected') {
+        status.textContent = 'Connect your keyboard first (tap the Keys chip at the top).';
+        return;
+      }
+      status.textContent = 'Listening… press a pad or button on your keyboard now.';
+      midi.learnNext((t) => {
+        store.setLocal('restartTrigger', t);
+        paintRestartKey();
+        close && close();
+        toast(`Restart button set: ${triggerName(t)}.`, { kind: 'good' });
+      });
+    };
+    close = sheet(h('div', { class: 'sheet-body' },
+      h('p', {}, 'Pick a pad or button on your MIDI keyboard. Pressing it starts the part again from the top, even on the results screen.'),
+      h('p', { class: 'muted small' }, 'Drum pads work well. A piano key works too, but it will no longer play a note. On a computer, the R key always restarts.'),
+      cur ? h('p', { class: 'small' }, `Now: ${triggerName(cur)}`) : null,
+      status,
+      h('div', { class: 'row-actions' },
+        cur ? h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { store.setLocal('restartTrigger', null); paintRestartKey(); close(); } }, 'Clear') : null,
+        h('button', { class: 'btn btn-primary', type: 'button', 'data-autofocus': '', onclick: listen_ }, 'Listen for button'))),
+    { title: 'Restart button', onClose: () => midi.cancelLearn() });
+  }
+
   // ----- setup -----
 
   function reset() {
@@ -365,7 +453,7 @@ export function createSong(ctx, cfg) {
   return {
     mount() {
       ctx.setTitle(song.title);
-      ctx.body.append(h('div', { class: 'prompt-block song' }, toolbar, card, summary));
+      ctx.body.append(h('div', { class: 'prompt-block song' }, toolbar, toggles, card, summary));
       requestAnimationFrame(() => reset());
       if (typeof ResizeObserver === 'function') {
         let last = 0;
@@ -400,6 +488,9 @@ export function createSong(ctx, cfg) {
     onPedal(e) {
       if (e.down && phase === 'idle' && pref.mode === 'play') go_();
     },
+    onRestart() {
+      restart();
+    },
     onKey(e) {
       if ((e.key === 'Enter' || e.key === ' ') && phase === 'idle' && pref.mode === 'play') {
         go_();
@@ -409,6 +500,8 @@ export function createSong(ctx, cfg) {
     },
     destroy() {
       cancelAnimationFrame(raf);
+      audio.stopClicks();
+      ctx.app.midi.cancelLearn();
       ro && ro.disconnect();
       kb.clearMarks();
     },

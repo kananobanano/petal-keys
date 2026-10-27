@@ -40,6 +40,7 @@ export class AudioEngine {
     this.volume = 0.85;
     this.sfxOn = true;
     this.instrument = 'piano';
+    this.clicks = [];
     this.loadState = 'idle'; // idle | loading | ready | failed
     this.onstate = null;
   }
@@ -331,6 +332,7 @@ export class AudioEngine {
 
   releaseAll() {
     if (!this.ctx) return;
+    this.stopClicks();
     for (const v of this.voices) this._release(v, this.ctx.currentTime, 0.05);
     this.live.clear();
     this.sustain = false;
@@ -364,6 +366,23 @@ export class AudioEngine {
     g.connect(this.sfxBus);
     o.start(when);
     o.stop(when + 0.09);
+    this.clicks.push(o);
+    o.onended = () => {
+      const i = this.clicks.indexOf(o);
+      if (i >= 0) this.clicks.splice(i, 1);
+    };
+  }
+
+  /** Cancel metronome clicks that are still waiting to sound. */
+  stopClicks() {
+    for (const o of this.clicks) {
+      try {
+        o.stop();
+      } catch {
+        /* already stopped */
+      }
+    }
+    this.clicks = [];
   }
 
   /** Little feedback sounds: 'good', 'soft-wrong', 'done', 'tick'. */

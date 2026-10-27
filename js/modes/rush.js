@@ -318,6 +318,13 @@ export function createRush(ctx, cfg) {
     onPedal(e) {
       if (e.down && phase === 'study') start();
     },
+    onRestart() {
+      if (phase === 'listen') return;
+      cancelAnimationFrame(raf);
+      audio.releaseAll();
+      phase = 'study';
+      start();
+    },
     onKey(e) {
       if (e.key === 'Enter' || e.key === ' ') {
         if (phase === 'study') {
@@ -329,6 +336,7 @@ export function createRush(ctx, cfg) {
     },
     destroy() {
       cancelAnimationFrame(raf);
+      audio.stopClicks();
       cancelAnimationFrame(listenTimer);
       ro && ro.disconnect();
       kb.clearMarks();

@@ -21,7 +21,10 @@ const TABS = [
 const store = new Store().load();
 const audio = new AudioEngine();
 const bus = new InputBus();
-const midi = new MidiInput(bus, { ignoreDrumChannel: () => store.settings.ignoreDrumChannel });
+const midi = new MidiInput(bus, {
+  ignoreDrumChannel: () => store.settings.ignoreDrumChannel,
+  restartTrigger: () => store.getLocal('restartTrigger'),
+});
 
 const app = {
   store,
@@ -307,6 +310,9 @@ function wireInput() {
     app.kb.release(e.midi);
     if (app.session) app.session.onNoteOff(e);
   });
+  bus.on('restart', () => {
+    if (app.session) app.session.onRestart();
+  });
   bus.on('pedal', (e) => {
     audio.setSustain(e.down);
     if (app.session) app.session.onPedal(e);
@@ -327,6 +333,11 @@ function wireInput() {
       }
       const tag = e.target && e.target.tagName;
       if ((e.key === ' ' || e.key === 'Enter') && (tag === 'BUTTON' || tag === 'A')) return;
+      if (e.code === 'KeyR' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        app.session.onRestart();
+        e.preventDefault();
+        return;
+      }
       if (app.session.onKey(e)) e.preventDefault();
     }
   });

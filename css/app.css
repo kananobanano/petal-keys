@@ -1071,3 +1071,7 @@ body.in-exercise .toasts { top: calc(64px + env(safe-area-inset-top, 0px)); bott
 .staff-svg .bar-num { font: 700 10px var(--font-body); fill: var(--ink-3); }
 .staff-svg .st-active { color: var(--lav-ink); }
 @media (min-width: 700px) { .song-card { max-height: min(50vh, 560px); } }
+.song-toggles { gap: 4px 14px; }
+.song-toggles .switch-row { padding: 2px 0; }
+.chip-btn { cursor: pointer; }
+.learn-status { min-height: 1.5em; font-weight: 700; color: var(--lav-ink); }

@@ -226,6 +226,10 @@ export class Session {
     this.mode && this.mode.onPedal && this.mode.onPedal(e);
   }
 
+  onRestart() {
+    this.mode && this.mode.onRestart && this.mode.onRestart();
+  }
+
   onKey(e) {
     if (this.mode && this.mode.onKey && this.mode.onKey(e)) return true;
     return false;

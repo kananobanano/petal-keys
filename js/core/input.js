@@ -60,7 +60,8 @@ export class InputBus extends EventTarget {
 // ---------- Web MIDI ----------
 
 export class MidiInput {
-  constructor(bus, { ignoreDrumChannel = () => true } = {}) {
+  constructor(bus, { ignoreDrumChannel = () => true, restartTrigger = null } = {}) {
+    this.restartTrigger = restartTrigger;
     this.bus = bus;
     this.access = null;
     this.status = typeof navigator !== 'undefined' && navigator.requestMIDIAccess ? 'idle' : 'unsupported';
@@ -124,12 +125,44 @@ export class MidiInput {
     this._emit();
   }
 
+  /** Wait for the next button/pad/key and hand it to fn (MIDI learn). */
+  learnNext(fn) {
+    this._learn = fn;
+  }
+
+  cancelLearn() {
+    this._learn = null;
+  }
+
   _onMessage(e) {
     const data = e.data;
     if (!data || data.length < 2) return;
     const status = data[0];
     const cmd = status & 0xf0;
     const channel = status & 0x0f;
+    // a "press": note on, a controller going up, or a program change
+    const press =
+      cmd === 0x90 && data[2] > 0 ? { type: 'note', ch: channel, num: data[1] }
+        : cmd === 0xb0 && data[2] > 0 && data[1] !== 64 ? { type: 'cc', ch: channel, num: data[1] }
+          : cmd === 0xc0 ? { type: 'pc', ch: channel, num: data[1] }
+            : null;
+    if (this._learn && press) {
+      const fn = this._learn;
+      this._learn = null;
+      fn(press);
+      return;
+    }
+    const trig = this.restartTrigger && this.restartTrigger();
+    if (trig) {
+      const isTrig = (p) => p && p.type === trig.type && p.ch === trig.ch && p.num === trig.num;
+      if (isTrig(press)) {
+        this.bus.dispatchEvent(new CustomEvent('restart', { detail: { source: 'midi' } }));
+        return;
+      }
+      // swallow the matching release so a trigger key never sounds
+      if (trig.type === 'note' && (cmd === 0x80 || cmd === 0x90) && channel === trig.ch && data[1] === trig.num) return;
+      if (trig.type === 'cc' && cmd === 0xb0 && channel === trig.ch && data[1] === trig.num) return;
+    }
     if (channel === 9 && this.ignoreDrumChannel()) return;
     let t = e.timeStamp;
     const now = performance.now();

@@ -81,6 +81,15 @@ and `Z` / `X` change the octave.
    **Practice → Songs → Add song** and pick it from Downloads.
 3. Tap the song. Pick a part, a hand and Wait or Play along.
 
+While learning a song:
+
+- **Key hints** light up the next key to play, in both Wait and Play along.
+  **Note names** writes the letter under each note. Turn either off when
+  you want to practise reading.
+- **Quick restart** starts the part again from the top, even from the
+  results screen: tap **Restart**, press **R** on a computer, or set a pad or
+  button on your MIDI keyboard with **Set restart button** (Note Rush uses it too).
+
 Songs are stored on the device you added them on. They are not part of the
 backup file (to keep it tiny), so add the file on each device; your best
 scores for songs do travel with backups.
