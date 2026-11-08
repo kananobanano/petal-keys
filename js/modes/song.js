@@ -333,7 +333,7 @@ export function createSong(ctx, cfg) {
       const ev = expected[i].ev;
       if (!r.hit) states[ev] = 'miss';
       else if (states[ev] !== 'miss') states[ev] = 'good';
-      if (r.hit && !judgements[ev]) judgements[ev] = { label: r.label, cls: r.cls };
+      if (r.hit && !judgements[ev]) judgements[ev] = { label: r.label, cls: r.cls, ms: r.err };
     });
     // keys you pressed that weren't in the music: faint pink notes where you hit them
     const anyOctave = store.settings.anyOctave;
@@ -351,7 +351,14 @@ export function createSong(ctx, cfg) {
     });
     draw(states, { judgements, ghosts });
     card.scrollTo({ top: 0, behavior: 'smooth' });
-    finishRun(res.combined, res, ghosts.length ? ' The faint pink notes show extra keys you pressed.' : '');
+    let note = ghosts.length ? ' The faint pink notes show extra keys you pressed.' : '';
+    // the same lean every time usually means a device delay, not you
+    const hits = res.results.filter((r) => r.hit);
+    const mean = hits.length ? hits.reduce((s, r) => s + r.err, 0) / hits.length : 0;
+    if (hits.length >= 3 && Math.abs(mean) > 70) {
+      note += ` On average you were ${Math.round(Math.abs(mean))} ms ${mean > 0 ? 'late' : 'early'}. If that happens every time, try Me → Timing check.`;
+    }
+    finishRun(res.combined, res, note);
   }
 
   // ----- results -----

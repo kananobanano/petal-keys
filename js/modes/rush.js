@@ -222,7 +222,7 @@ export function createRush(ctx, cfg) {
       const ev = expected[i].ev;
       if (!r.hit) states[ev] = 'miss';
       else if (states[ev] !== 'miss') states[ev] = 'good';
-      if (r.hit && !judgements[ev]) judgements[ev] = { label: r.label, cls: r.cls };
+      if (r.hit && !judgements[ev]) judgements[ev] = { label: r.label, cls: r.cls, ms: r.err };
     });
     draw({ states, judgements, ghosts });
     if (staffCard.scrollTop > 0) staffCard.scrollTo({ top: 0, behavior: 'smooth' });

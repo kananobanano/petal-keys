@@ -17,7 +17,8 @@ Read music, build chords and train your ears, one short lesson at a time.
   your learned keys too.
 - **Note Rush**: look at a short line for as long as you like, tap Go, hear
   four clicks, then play along with the moving line. You get a score for the
-  right notes and a separate score for timing (Perfect / Great / Good).
+  right notes and a separate score for timing (Perfect / Great / Good /
+  Early / Late), with how far off each note was in ms (−40 early, +80 late).
   In Practice, pick any line length from 1 to 16 bars, and where lines come
   from: **Melody** (tune-like lines built on common chord progressions, ending
   on the home note), **Random**, or **My songs**.

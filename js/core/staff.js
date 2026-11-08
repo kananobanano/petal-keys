@@ -92,7 +92,7 @@ function defaultStemDir(part) {
  *   states: { [eventId]: 'good' | 'bad' | 'active' | ... },
  *   noteStates: { 'eventId:noteIndex': cls },
  *   ghosts: [{ absBeat, note, cls }],     // extra notes someone played
- *   judgements: { [eventId]: { label, cls } },
+ *   judgements: { [eventId]: { label, cls, ms? } },   // ms: timing offset shown under the label
  *   noteNames: bool, extent: { treble: [minP, maxP], bass: [...] },
  *   keyHints: bool  -> small coloured ♯/♭ on notes changed by the key signature
  *   label: accessible description
@@ -413,7 +413,9 @@ export function renderStaff(target, score, opts = {}) {
     ext[si].max = Math.max(ext[si].max, p + 1);
   }
 
-  const judgeRow = opts.judgements ? 1.9 : 0;
+  // labels row; one more line when the timing offsets (ms) are shown under them
+  const judgeMs = !!opts.judgements && Object.values(opts.judgements).some((j) => j && j.ms != null);
+  const judgeRow = opts.judgements ? (judgeMs ? 3.1 : 1.9) : 0;
   const top = Math.max(2.2, (ext[0].max - 8) / 2 + 1.1) + judgeRow;
   const lastExt = ext[ext.length - 1];
   let maxStack = 1;
@@ -655,6 +657,12 @@ export function renderStaff(target, score, opts = {}) {
         const j = opts.judgements[ev.id];
         if (!j) continue;
         g.append(svg('text', { x: P(eventX[ev.id]), y: P(y0 + 1.5), class: `judge j-${j.cls}`, 'text-anchor': 'middle' }, j.label));
+        if (j.ms != null) {
+          // how far off, in ms: "−40" early, "+80" late
+          const ms = Math.round(j.ms);
+          const txt = ms === 0 ? '0' : `${ms > 0 ? '+' : '−'}${Math.abs(ms)}`;
+          g.append(svg('text', { x: P(eventX[ev.id]), y: P(y0 + 2.75), class: 'judge-ms', 'text-anchor': 'middle' }, txt));
+        }
       }
     }
 

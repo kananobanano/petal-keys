@@ -1057,6 +1057,7 @@ body.in-exercise .toasts { top: calc(64px + env(safe-area-inset-top, 0px)); bott
 .staff-svg .st-active { color: var(--lav-ink); }
 .staff-svg .ghost { color: var(--pink-ink); opacity: 0.5; }
 .staff-svg .judge { font: 800 11px var(--font-body); fill: var(--lav-ink); }
+.staff-svg .judge-ms { font: 700 10px var(--font-body); fill: var(--ink-2); font-variant-numeric: tabular-nums; }
 .staff-svg .j-perfect { fill: var(--mint-ink); }
 .staff-svg .j-great { fill: var(--sky-ink); }
 .staff-svg .j-early, .staff-svg .j-late { fill: var(--gold-ink); }
