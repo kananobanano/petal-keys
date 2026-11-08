@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import * as M from '../js/core/music.js';
 import { mergeSaves, computeStreak, newSave, encodeSave, decodeSave, migrate } from '../js/core/store.js';
-import { generatePassage, generateMelody, keyAcc, scoreAttempt, matchWindow, RHYTHM_LEVELS } from '../js/core/rushlogic.js';
+import { generatePassage, generateMelody, keyAcc, scoreAttempt, matchWindow, assignWindows, WINDOW_MIN, WINDOW_MAX, RHYTHM_LEVELS } from '../js/core/rushlogic.js';
 import { seededRng, addDays } from '../js/core/util.js';
 import * as K from '../js/core/keys.js';
 import { LESSONS, UNITS } from '../js/lessons.js';
@@ -242,6 +242,31 @@ await test('scoring', () => {
   const strict = scoreAttempt(exp, exp.map((e) => ({ midi: e.midi + 12, t: e.t })), { windowMs: 400 });
   assert.equal(strict.hits, 0);
   assert.equal(matchWindow([{ absBeat: 0 }, { absBeat: 0.5 }, { absBeat: 1 }], 1000), 225);
+});
+
+await test('per-note timing windows are fair', () => {
+  // eighths G A B, then a long D; at ♩=110 an eighth is ~273 ms
+  const e8 = 273;
+  const exp = [
+    { id: 'a', midi: 67, t: 1000 },
+    { id: 'b', midi: 69, t: 1000 + e8 },
+    { id: 'c', midi: 71, t: 1000 + 2 * e8 },
+    { id: 'd', midi: 74, t: 1000 + 3 * e8 },
+  ];
+  assignWindows(exp, { anyOctave: true });
+  assert.ok(exp.every((e) => e.win === WINDOW_MAX), 'different keys never get squeezed');
+  // the long D played 250 ms late still counts (as Late), with no extra key
+  const late = scoreAttempt(exp, exp.map((e) => ({ midi: e.midi, t: e.t + (e.id === 'd' ? 250 : 0) })), { anyOctave: true });
+  assert.equal(late.hits, 4);
+  assert.equal(late.extra.length, 0);
+  assert.equal(late.results[3].label, 'Late');
+  // the same key twice in quick eighths: windows shrink so presses can't swap
+  const rep = assignWindows([{ midi: 60, t: 0 }, { midi: 60, t: e8 }, { midi: 64, t: 2 * e8 }], { anyOctave: true });
+  assert.equal(rep[0].win, Math.round(e8 / 2));
+  assert.equal(rep[2].win, WINDOW_MAX);
+  // any-octave: C and the C an octave up are "the same key" for spacing
+  const oct = assignWindows([{ midi: 60, t: 0 }, { midi: 72, t: 200 }], { anyOctave: true });
+  assert.equal(oct[0].win, WINDOW_MIN);
 });
 
 console.log(`core tests: ${passed} passed`);

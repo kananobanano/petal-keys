@@ -8,7 +8,7 @@ import { sheet, toast } from '../ui/overlay.js';
 import { icon } from '../ui/icons.js';
 import { renderStaff } from '../core/staff.js';
 import { getSong, buildView, sections, matches } from '../core/songs.js';
-import { scoreAttempt, matchWindow } from '../core/rushlogic.js';
+import { scoreAttempt, matchWindow, assignWindows } from '../core/rushlogic.js';
 import { button } from './common.js';
 
 export function createSong(ctx, cfg) {
@@ -278,7 +278,8 @@ export function createSong(ctx, cfg) {
         flat.push({ absBeat: st.beat });
       }
     }
-    win = matchWindow(flat, msPerBeat);
+    assignWindows(expected, { anyOctave: store.settings.anyOctave });
+    win = Math.max(...expected.map((e) => e.win), matchWindow(flat, msPerBeat));
     ctx.app.debug = { song: { expected, startPerf, msPerBeat } }; // handy for testing
     draw({}, {});
     card.scrollTo({ top: 0 });
@@ -534,7 +535,7 @@ export function createSong(ctx, cfg) {
         for (const ex of expected) {
           if (live.has(ex.id) || !matches(e.midi, ex.midi, store.settings.anyOctave)) continue;
           const dt = e.time - ex.t;
-          if (Math.abs(dt) <= win && (!best || Math.abs(dt) < Math.abs(best.dt))) best = { ex, dt };
+          if (Math.abs(dt) <= ex.win && (!best || Math.abs(dt) < Math.abs(best.dt))) best = { ex, dt };
         }
         if (best) {
           live.add(best.ex.id);

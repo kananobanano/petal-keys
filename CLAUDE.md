@@ -253,6 +253,12 @@ notes), no grace notes, max two staves, no lyrics/dynamics/slurs.
   between, bar 3 of each phrase echoes bar 1, ends V–I or IV–I on the home
   note), `new` (random walk, `generatePassage`), `songs`. Lessons and Mix
   still use the random walk.
+- Timing (Note Rush and Song Mode play along): labels Perfect ≤50 ms, Great
+  ≤100, Good ≤170, else Early/Late. Each expected note has its own window
+  (`assignWindows`: up to 450 ms, only shrinking to half the gap to the same
+  key played again, min 120). Never go back to one window for the whole line:
+  a single pair of eighths used to squeeze every note to ±150 ms, so late but
+  right presses were counted as misses plus wrong keys (Minty noticed).
 - Minty wants chord progressions as a topic later: showing chord names above
   melody lines, a progression drill in Chord Builder, and a short lesson.
 

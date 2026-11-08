@@ -5,7 +5,7 @@
 import { h } from '../core/util.js';
 import { parseNote, spell, noteLabel, midiOf } from '../core/music.js';
 import { renderStaff, staffPos } from '../core/staff.js';
-import { generatePassage, generateMelody, scoreAttempt, matchWindow, judgeTiming } from '../core/rushlogic.js';
+import { generatePassage, generateMelody, scoreAttempt, matchWindow, judgeTiming, assignWindows } from '../core/rushlogic.js';
 import { button, clefKey, rangeOf, poolExtent, matchesNote } from './common.js';
 import { songPassage } from '../core/songs.js';
 import { toast } from '../ui/overlay.js';
@@ -134,7 +134,8 @@ export function createRush(ctx, cfg) {
     startPerf = audio.perfTimeOf(tStart);
     expected = passage.notes.map((n) => ({ id: n.id, ev: n.ev, midi: n.midi, t: startPerf + n.absBeat * msPerBeat + calib }));
     ctx.app.debug = { rush: { passage, startPerf, msPerBeat, calib, expected } }; // handy for testing
-    win = matchWindow(passage.notes, msPerBeat);
+    assignWindows(expected, { anyOctave: store.settings.anyOctave });
+    win = Math.max(...expected.map((e) => e.win), matchWindow(passage.notes, msPerBeat));
     const lastNote = passage.notes[passage.notes.length - 1];
     endBeat = Math.max(passage.beats, lastNote.absBeat + win / msPerBeat) + 0.15;
     scoreBox.hidden = true;
@@ -334,7 +335,7 @@ export function createRush(ctx, cfg) {
       for (const ex of expected) {
         if (live.has(ex.id) || !matchesNote(e.midi, ex.midi, anyOctave)) continue;
         const dt = e.time - ex.t;
-        if (Math.abs(dt) <= win && (!best || Math.abs(dt) < Math.abs(best.dt))) best = { ex, dt };
+        if (Math.abs(dt) <= ex.win && (!best || Math.abs(dt) < Math.abs(best.dt))) best = { ex, dt };
       }
       if (best) {
         const j = judgeTiming(best.dt);

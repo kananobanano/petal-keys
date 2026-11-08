@@ -270,6 +270,27 @@ export function judgeTiming(errMs) {
     : { label: 'Late', points: 30, cls: 'late' };
 }
 
+export const WINDOW_MIN = 120;
+export const WINDOW_MAX = 450;
+
+/**
+ * Give every expected note its own window (e.win, in ms): wide by default, and
+ * only narrower when the same key comes again soon, so two presses can't be
+ * mixed up. A busy bar of eighths no longer makes the long notes strict.
+ */
+export function assignWindows(expected, { anyOctave = false, max = WINDOW_MAX } = {}) {
+  for (const e of expected) {
+    let gap = Infinity;
+    for (const o of expected) {
+      if (o === e || o.t === e.t) continue;
+      const same = anyOctave ? pc(o.midi) === pc(e.midi) : o.midi === e.midi;
+      if (same) gap = Math.min(gap, Math.abs(o.t - e.t));
+    }
+    e.win = Math.round(Math.max(WINDOW_MIN, Math.min(max, 0.5 * gap)));
+  }
+  return expected;
+}
+
 /** How far a played note may drift from its spot and still count. */
 export function matchWindow(notes, msPerBeat) {
   let minGap = Infinity;
@@ -288,12 +309,13 @@ export function matchWindow(notes, msPerBeat) {
  */
 export function scoreAttempt(expected, played, { windowMs = 350, anyOctave = false } = {}) {
   const pairs = [];
+  const winOf = (e) => (e.win != null ? e.win : windowMs);
   expected.forEach((e, ei) => {
     played.forEach((p, pi) => {
       const exact = e.midi === p.midi;
       const same = exact || (anyOctave && pc(e.midi) === pc(p.midi));
       const dt = p.t - e.t;
-      if (same && Math.abs(dt) <= windowMs) pairs.push({ ei, pi, dt, cost: Math.abs(dt) + (exact ? 0 : 40) });
+      if (same && Math.abs(dt) <= winOf(e)) pairs.push({ ei, pi, dt, cost: Math.abs(dt) + (exact ? 0 : 40) });
     });
   });
   pairs.sort((a, b) => a.cost - b.cost);
@@ -306,8 +328,8 @@ export function scoreAttempt(expected, played, { windowMs = 350, anyOctave = fal
   }
 
   // Played notes inside the passage's time span that matched nothing.
-  const first = Math.min(...expected.map((e) => e.t)) - windowMs;
-  const last = Math.max(...expected.map((e) => e.t)) + windowMs;
+  const first = Math.min(...expected.map((e) => e.t - winOf(e)));
+  const last = Math.max(...expected.map((e) => e.t + winOf(e)));
   const extra = [];
   played.forEach((p, pi) => {
     if (!usedP.has(pi) && p.t >= first && p.t <= last) extra.push(pi);
