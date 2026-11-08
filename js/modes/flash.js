@@ -5,11 +5,16 @@ import { h } from '../core/util.js';
 import { parseNote, midiOf, spell, noteLabel, pitchName, diatonicIndex, pc } from '../core/music.js';
 import { renderStaff, singleScore, staffPos } from '../core/staff.js';
 import { pickWeighted, matchesNote, clefKey, rangeOf, poolExtent, wait, button } from './common.js';
+import { keyAcc, keyName, signatureNotes, spellInKey, listText, blackKeyHint } from '../core/keys.js';
 
 export function createFlash(ctx, cfg) {
   const { store, kb, audio } = ctx;
   const clef = cfg.clef || 'treble';
-  const pool = (cfg.pool || ['C4', 'D4', 'E4']).map((n) => (typeof n === 'string' ? parseNote(n) : n));
+  const basePool = (cfg.pool || ['C4', 'D4', 'E4']).map((n) => (typeof n === 'string' ? parseNote(n) : n));
+  // With key signatures, every note follows the key (F becomes F♯ in G major…).
+  const keys = cfg.keys || (cfg.key != null ? [cfg.key] : null);
+  const letterPool = keys ? [...new Map(basePool.map((n) => [`${n.letter}${n.octave}`, n])).values()] : basePool;
+  const pool = keys ? keys.flatMap((k) => letterPool.map((n) => ({ ...spellInKey(n, k), key: k }))) : basePool;
   const total = cfg.count || 10;
   const answerBy = cfg.answer || 'keys';
   const ck = clefKey(clef);
@@ -17,6 +22,7 @@ export function createFlash(ctx, cfg) {
   const extent = poolExtent(pool, clef, staffPos);
 
   let done = 0;
+  let curKey = 0;
   let target = null;
   let wrong = 0;
   let locked = false;
@@ -25,7 +31,12 @@ export function createFlash(ctx, cfg) {
   let ghost = null;
 
   const staffEl = h('div', { class: 'staff-card flash-card' });
-  const sub = h('p', { class: 'prompt-sub' }, answerBy === 'names' ? 'Tap the name of this note.' : 'Play this note.');
+  const sub = h('p', { class: 'prompt-sub' });
+  const paintSub = () => {
+    const ask = answerBy === 'names' ? 'Tap the name of this note.' : 'Play this note.';
+    sub.textContent = keys ? `${keyName(curKey)}${curKey ? ` (${listText(signatureNotes(curKey))})` : ''}. ${ask}` : ask;
+  };
+  paintSub();
   const namesEl = h('div', { class: 'name-pad' });
 
   function draw(state = null) {
@@ -37,15 +48,18 @@ export function createFlash(ctx, cfg) {
       maxSpace: 16,
       extent: { [clef]: extent },
       states: state ? { n0: state } : {},
-      label: `${clef === 'bass' ? 'Bass' : 'Treble'} staff with one note`,
+      label: `${clef === 'bass' ? 'Bass' : 'Treble'} staff with one note${keys ? `, ${keyName(curKey)}` : ''}`,
     };
     if (ghost) opts.ghosts = [{ absBeat: 0, note: ghost, cls: 'wrong', dx: 1.7 }];
-    renderStaff(staffEl, singleScore([target], clef), opts);
+    renderStaff(staffEl, { ...singleScore([target], clef), key: curKey }, opts);
   }
 
   function nextItem() {
     target = pickWeighted(pool, keyOf, store, lastKey);
     lastKey = keyOf(target);
+    curKey = target.key || 0;
+    ctx.app.debug = { flash: { target, key: curKey } }; // handy for testing
+    paintSub();
     wrong = 0;
     locked = false;
     ghost = null;
@@ -87,7 +101,14 @@ export function createFlash(ctx, cfg) {
       draw();
     }
     const played = playedNote ? noteLabel(playedNote, { octave: answerBy === 'keys' }) : '';
-    ctx.feedback(`Not quite${played ? `, that was ${played}` : ''}.${dir}${wrong >= 2 ? ` It's ${noteLabel(target)}.` : ''}`, 'hint');
+    // Played the plain letter when the key signature changes it?
+    const forgotKey = keys && target.acc !== 0 && playedNote && playedNote.letter === target.letter && keyAcc(target.letter, curKey) === target.acc
+      && pc(midiOf(playedNote)) === pc(midiOf(target) - target.acc);
+    if (forgotKey) {
+      ctx.feedback(`So close! The key signature says every ${target.letter} is ${noteLabel(target, { octave: false })}. ${blackKeyHint(target)}.`, 'hint');
+    } else {
+      ctx.feedback(`Not quite${played ? `, that was ${played}` : ''}.${dir}${wrong >= 2 ? ` It's ${noteLabel(target)}.` : ''}`, 'hint');
+    }
     if (wrong >= 2 && answerBy === 'keys') kb.mark(tMidi, 'hint');
     if (wrong >= 2 && answerBy === 'names') {
       namesEl.querySelectorAll('button').forEach((b) => b.classList.toggle('hinted', b.dataset.name === pitchName(target)));

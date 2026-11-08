@@ -27,7 +27,7 @@ export function createSong(ctx, cfg) {
   const two = song.staves.length > 1;
   const prefKey = `song:${entry.id}`;
   const lastBar = song.measures.length - 1;
-  const pref = { sec: secs.length > 1 ? 1 : 0, hand: 'right', mode: 'wait', hints: true, names: false, tempo: null, from: 0, to: Math.min(3, lastBar), ...(store.getLocal(prefKey) || {}) };
+  const pref = { sec: secs.length > 1 ? 1 : 0, hand: 'right', mode: 'wait', hints: true, names: false, keyHints: true, tempo: null, from: 0, to: Math.min(3, lastBar), ...(store.getLocal(prefKey) || {}) };
   if (pref.sec !== 'custom' && !(pref.sec >= 0 && pref.sec < secs.length)) pref.sec = 0;
   pref.from = Math.max(0, Math.min(lastBar, Number(pref.from) || 0));
   pref.to = Math.max(pref.from, Math.min(lastBar, Number(pref.to) || 0));
@@ -119,6 +119,7 @@ export function createSong(ctx, cfg) {
   const toggles = h('div', { class: 'song-tools song-toggles' },
     toggle('song-hints', 'Key hints', 'hints', () => { paintHints(); waitFeedback(); }),
     toggle('song-names', 'Note names', 'names', () => draw()),
+    song.key ? toggle('song-keyhints', 'Key reminder', 'keyHints', () => draw()) : null,
     restartKeyBtn);
   const tempoVal = h('span', { class: 'tempo-val' });
   const tempoCtl = h('div', { class: 'tempo', role: 'group', 'aria-label': 'Tempo' },
@@ -140,7 +141,7 @@ export function createSong(ctx, cfg) {
     lastExtra = extra;
     const w = Math.max(260, staffEl.clientWidth || card.clientWidth - 24 || 320);
     layout = renderStaff(staffEl, view.score, {
-      width: w, maxSpace: 12, minSpace: 9.5, wrapSpace: 10, barNumbers: true, noteNames: pref.names, states, label: song.title, ...extra,
+      width: w, maxSpace: 12, minSpace: 9.5, wrapSpace: 10, barNumbers: true, noteNames: pref.names, keyHints: !!(song.key && pref.keyHints), states, label: song.title, ...extra,
     });
   }
 

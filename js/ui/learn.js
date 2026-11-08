@@ -5,13 +5,16 @@ import { h } from '../core/util.js';
 import { icon } from './icons.js';
 import { sheet, confirmSheet } from './overlay.js';
 import { UNITS, LESSONS, isOpen, currentIndex, lessonIndex } from '../lessons.js';
+import { keyName } from '../core/keys.js';
 
 const CONTOUR = [0, 0.55, 0.85, 0.55, 0, -0.55, -0.85, -0.55];
 
 function drillText(d) {
   switch (d.mode) {
     case 'name': return 'Find keys by their names';
-    case 'flash': return `Read ${d.count} notes on the ${d.clef} staff`;
+    case 'flash': return d.key ? `Read ${d.count} notes in ${keyName(d.key)}` : `Read ${d.count} notes on the ${d.clef} staff`;
+    case 'scale': return `Play the scale: ${d.keys.map(keyName).join(', ')}`;
+    case 'keyname': return `Name the key: ${d.count} key signatures`;
     case 'rush': return `Note Rush: ${d.count} short lines at ♩ = ${d.tempo}`;
     case 'chord': return `Build chords: ${d.chords.join(', ')}`;
     case 'hl': return `Higher or lower: ${d.count} rounds`;

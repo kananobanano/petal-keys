@@ -94,6 +94,7 @@ function defaultStemDir(part) {
  *   ghosts: [{ absBeat, note, cls }],     // extra notes someone played
  *   judgements: { [eventId]: { label, cls } },
  *   noteNames: bool, extent: { treble: [minP, maxP], bass: [...] },
+ *   keyHints: bool  -> small coloured ♯/♭ on notes changed by the key signature
  *   label: accessible description
  * }
  * Returns a layout with beatToX(), setPlayhead(beat|null) and the svg.
@@ -137,7 +138,8 @@ export function renderStaff(target, score, opts = {}) {
     return { index: mi, start, len, events, label: m.label };
   });
 
-  // Accidentals: carry through the bar (key of C), or show all in free mode.
+  // Accidentals: carry through the bar from the key signature, or start fresh
+  // for every note in free mode (still respecting the key signature).
   for (const m of measures) {
     const state = staves.map(() => new Map());
     for (const ev of m.events) {
@@ -145,8 +147,13 @@ export function renderStaff(target, score, opts = {}) {
         if (free) state[si].clear();
         for (const x of part) {
           const key = x.n.letter + x.n.octave;
-          const cur = state[si].has(key) ? state[si].get(key) : free ? 0 : keyAcc[x.n.letter] || 0;
+          const cur = state[si].has(key) ? state[si].get(key) : keyAcc[x.n.letter] || 0;
           if (x.n.acc !== cur) x.acc = x.n.acc === 1 ? 'sharp' : x.n.acc === -1 ? 'flat' : 'natural';
+          else if (opts.keyHints && x.n.acc !== 0 && keyAcc[x.n.letter] === x.n.acc) {
+            // key reminder: a small coloured sign on notes the key signature changes
+            x.acc = x.n.acc > 0 ? 'sharp' : 'flat';
+            x.hint = true;
+          }
           state[si].set(key, x.n.acc);
         }
       });
@@ -549,7 +556,7 @@ export function renderStaff(target, score, opts = {}) {
             eg.append(ng);
             const hx = ev.x + x.dx * hw;
             const hy = Y(k, x.p);
-            if (x.acc) ng.append(text(G[x.acc], ev.x + x.accX, hy, 'mus acc'));
+            if (x.acc) ng.append(text(G[x.acc], ev.x + x.accX, hy, x.hint ? 'mus acc key-hint' : 'mus acc'));
             ng.append(text(headGlyph(part.dur), hx, hy, 'mus head'));
             heads.set(`${ev.id}:${x.i}`, { x: hx, y: hy, sys: si, k, dir, hw, ev, n: x.n });
             if (isDotted(part.dur)) {

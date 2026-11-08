@@ -9,6 +9,8 @@ import { createFindNote } from './findnote.js';
 import { createFreePlay } from './freeplay.js';
 import { createCalibrate } from './calibrate.js';
 import { createSong } from './song.js';
+import { createScale } from './scale.js';
+import { createKeyName } from './keyname.js';
 
 export const MODES = {
   name: createName,
@@ -20,4 +22,6 @@ export const MODES = {
   free: createFreePlay,
   calib: createCalibrate,
   song: createSong,
+  scale: createScale,
+  keyname: createKeyName,
 };

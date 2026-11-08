@@ -14,6 +14,7 @@ export const UNITS = [
   { id: 'F', title: 'Ear garden', blurb: 'Hearing higher and lower, then finding notes by ear.' },
   { id: 'G', title: 'Sharps & flats', blurb: 'The black keys, on the keyboard and on the staff.' },
   { id: 'H', title: 'Seventh chords', blurb: 'Four-note chords with a dreamy, J-pop sound.' },
+  { id: 'I', title: 'Keys & key signatures', blurb: 'Why some songs start with sharps or flats, and how to read them.' },
 ];
 
 export const LESSONS = [
@@ -239,6 +240,89 @@ export const LESSONS = [
     ],
     drill: { mode: 'chord', chords: ['Cmaj7', 'Fmaj7', 'Am7', 'Dm7'], count: 8 },
   },
+
+  // ---------- I: keys & key signatures ----------
+  {
+    id: 'L29', unit: 'I', title: 'Home sweet C', short: 'C scale',
+    cards: [
+      { title: 'What is a key?', text: 'A key is the family of notes a song likes to use, plus one note that feels like home. C major uses only the white keys, and C is home.', visual: { keys: { from: 'C4', to: 'C5', marks: { hint: ['C4', 'C5'] }, labels: 'all' } } },
+      { title: 'The C major scale', text: 'Play the family in order, home to home: C D E F G A B C. Listen to how the last C feels like arriving.', visual: { staff: { clef: 'treble', notes: W('C4', 'C5'), names: true } } },
+    ],
+    drill: { mode: 'scale', keys: [0], rounds: 2, count: 2 },
+  },
+  {
+    id: 'L30', unit: 'I', title: "G major's one sharp", short: 'One ♯',
+    cards: [
+      { title: 'Climb from G', text: 'Now climb from G to G. On white keys only, the step up to F sounds a little off. F wants to be one key higher: F♯, the black key just right of F.', visual: { keys: { from: 'G4', to: 'G5', marks: { hint: ['G4', 'A4', 'B4', 'C5', 'D5', 'E5', 'F#5', 'G5'] }, labels: ['G4', 'F#5', 'G5'] } } },
+      { title: 'The key signature', text: 'Instead of a ♯ before every F, the music puts one ♯ on the F line, right after the clef. It is a standing instruction: every F is F♯.', visual: { staff: { clef: 'treble', key: 1, notes: ['F#4', 'F#5'], names: true } } },
+    ],
+    drill: { mode: 'scale', keys: [1], rounds: 2, count: 2 },
+  },
+  {
+    id: 'L31', unit: 'I', title: 'Remember the sharp', short: 'Read in G',
+    cards: [
+      { title: 'Check the key first', text: 'The notes look plain, but the ♯ at the start still counts. Glance at the key signature before you play, like checking the weather.', visual: { staff: { clef: 'treble', key: 1, notes: ['G4', 'A4', 'B4', 'C5', 'D5', 'E5', 'F#5', 'G5'], names: true } } },
+    ],
+    drill: { mode: 'flash', clef: 'treble', pool: W('C4', 'C5'), key: 1, count: 12 },
+  },
+  {
+    id: 'L32', unit: 'I', title: "F major's one flat", short: 'One ♭',
+    cards: [
+      { title: 'Climb from F', text: 'Climb from F to F and the fourth note, B, sounds too high. It wants to be B♭, the black key just left of B.', visual: { keys: { from: 'F4', to: 'F5', marks: { hint: ['F4', 'G4', 'A4', 'Bb4', 'C5', 'D5', 'E5', 'F5'] }, labels: ['F4', 'Bb4', 'F5'] } } },
+      { title: 'One flat', text: 'F major has one ♭ on the B line: every B is B♭.', visual: { staff: { clef: 'treble', key: -1, notes: ['Bb4'], names: true } } },
+    ],
+    drill: { mode: 'scale', keys: [-1], rounds: 2, count: 2 },
+  },
+  {
+    id: 'L33', unit: 'I', title: 'Name that key', short: 'Name it',
+    cards: [
+      { title: 'Sharps come in order', text: 'Sharps always appear in the same order: F C G D A E B. Two sharps means F♯ and C♯.', visual: { staff: { clef: 'treble', key: 2, notes: [] } } },
+      { title: 'The sharp trick', text: 'Find the last sharp and go one key up. Last sharp C♯, one key up is D, so it is D major.', visual: { keys: { from: 'C4', to: 'E4', marks: { hint: ['C#4', 'D4'] }, labels: ['C#4', 'D4'] } } },
+      { title: 'Flats come in order too', text: 'Flats go B E A D G C F, the sharps backwards. Two flats means B♭ and E♭.', visual: { staff: { clef: 'treble', key: -2, notes: [] } } },
+      { title: 'The flat trick', text: 'The second-to-last flat names the key. B♭ E♭ means B♭ major. One flat is the odd one out: just remember F major. No sharps or flats at all is C major.', visual: null },
+    ],
+    drill: { mode: 'keyname', keys: [0, 1, -1, 2, -2], count: 8 },
+  },
+  {
+    id: 'L34', unit: 'I', title: 'Two and three sharps', short: 'D · A',
+    cards: [
+      { title: 'D major', text: 'D major has two sharps, F♯ and C♯. Start on D and climb to the next D.', visual: { staff: { clef: 'treble', key: 2, notes: ['D4', 'E4', 'F#4', 'G4', 'A4', 'B4', 'C#5', 'D5'], names: true } } },
+      { title: 'A major', text: 'A major adds G♯: F♯, C♯ and G♯. Three black keys in the climb.', visual: { staff: { clef: 'treble', key: 3, notes: [] }, keys: { from: 'A3', to: 'A4', marks: { hint: ['A3', 'B3', 'C#4', 'D4', 'E4', 'F#4', 'G#4', 'A4'] }, labels: ['C#4', 'F#4', 'G#4'] } } },
+    ],
+    drill: { mode: 'scale', keys: [2, 3], rounds: 2, count: 4 },
+  },
+  {
+    id: 'L35', unit: 'I', title: 'Two and three flats', short: 'B♭ · E♭',
+    cards: [
+      { title: 'B♭ major', text: 'B♭ major has two flats, B♭ and E♭. Home is B♭, the black key just left of B.', visual: { staff: { clef: 'treble', key: -2, notes: ['Bb3', 'C4', 'D4', 'Eb4', 'F4', 'G4', 'A4', 'Bb4'], names: true } } },
+      { title: 'E♭ major', text: 'E♭ major adds A♭: B♭, E♭ and A♭.', visual: { staff: { clef: 'treble', key: -3, notes: [] }, keys: { from: 'D4', to: 'F5', marks: { hint: ['Eb4', 'F4', 'G4', 'Ab4', 'Bb4', 'C5', 'D5', 'Eb5'] }, labels: ['Eb4', 'Ab4', 'Bb4'] } } },
+    ],
+    drill: { mode: 'scale', keys: [-2, -3], rounds: 2, count: 4 },
+  },
+  {
+    id: 'L36', unit: 'I', title: 'Four and five sharps', short: 'E · B',
+    cards: [
+      { title: 'E major', text: 'E major has four sharps: F♯, C♯, G♯ and D♯.', visual: { staff: { clef: 'treble', key: 4, notes: [] } } },
+      { title: 'B major', text: 'B major has five: it adds A♯. With this many, think of the keys that stay white instead. In B major, only E and B are white.', visual: { staff: { clef: 'treble', key: 5, notes: [] }, keys: { from: 'B3', to: 'B4', marks: { hint: ['B3', 'C#4', 'D#4', 'E4', 'F#4', 'G#4', 'A#4', 'B4'] }, labels: ['E4', 'B4'] } } },
+    ],
+    drill: { mode: 'scale', keys: [4, 5], rounds: 2, count: 4 },
+  },
+  {
+    id: 'L37', unit: 'I', title: 'Four and five flats', short: 'A♭ · D♭',
+    cards: [
+      { title: 'A♭ major', text: 'A♭ major has four flats: B♭, E♭, A♭ and D♭.', visual: { staff: { clef: 'treble', key: -4, notes: [] } } },
+      { title: 'D♭ major', text: 'D♭ major has five: it adds G♭. Only C and F stay white. Your song in D♭ lives here!', visual: { staff: { clef: 'treble', key: -5, notes: [] }, keys: { from: 'C4', to: 'C5', marks: { hint: ['Db4', 'Eb4', 'F4', 'Gb4', 'Ab4', 'Bb4', 'C5'] }, labels: ['C5', 'F4'] } } },
+    ],
+    drill: { mode: 'scale', keys: [-4, -5], rounds: 2, count: 4 },
+  },
+  {
+    id: 'L38', unit: 'I', title: 'One signature, two keys', short: 'Minor twins',
+    cards: [
+      { title: 'Major and minor twins', text: 'Every key signature belongs to a major key and a minor key. Start on the 6th note of the major scale and you get its minor twin, which sounds softer.', visual: { keys: { from: 'C4', to: 'A5', marks: { hint: ['A4', 'B4', 'C5', 'D5', 'E5', 'F5', 'G5', 'A5'], ref: ['C4'] }, labels: ['C4', 'A4'] } } },
+      { title: 'C major or A minor?', text: 'Both use only white keys. C major feels bright and settled, A minor softer and a little sad. Petal Keys names the major key, so a song marked “key of G” might really be E minor.', visual: null },
+    ],
+    drill: { mode: 'keyname', keys: [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5], minor: true, count: 10 },
+  },
 ];
 
 export const lessonIndex = (id) => LESSONS.findIndex((l) => l.id === id);
@@ -282,6 +366,17 @@ export function rhythmLevel(store) {
   let lv = 1;
   for (const l of reached(store)) if (l.drill.mode === 'rush') lv = Math.max(lv, l.drill.level);
   return lv;
+}
+
+/** Key signatures (in fifths) played in lessons reached so far, C first. */
+export function keyPool(store) {
+  const set = new Set([0]);
+  for (const l of reached(store)) {
+    const d = l.drill;
+    if (d.mode === 'scale') d.keys.forEach((k) => set.add(k));
+    if (d.mode === 'flash' && d.key != null) set.add(d.key);
+  }
+  return [...set].sort((a, b) => Math.abs(a) - Math.abs(b) || b - a);
 }
 
 export function chordPool(store) {

@@ -6,6 +6,11 @@ import * as M from '../js/core/music.js';
 import { mergeSaves, computeStreak, newSave, encodeSave, decodeSave, migrate } from '../js/core/store.js';
 import { generatePassage, generateMelody, keyAcc, scoreAttempt, matchWindow, RHYTHM_LEVELS } from '../js/core/rushlogic.js';
 import { seededRng, addDays } from '../js/core/util.js';
+import * as K from '../js/core/keys.js';
+import { LESSONS, UNITS } from '../js/lessons.js';
+
+// keep in step with js/modes/index.js (which needs a browser to import)
+const DRILL_MODES = ['name', 'flash', 'rush', 'chord', 'hl', 'find', 'scale', 'keyname'];
 
 let passed = 0;
 const test = async (name, fn) => {
@@ -163,6 +168,46 @@ await test('melody lines fill bars, stay in the pool and end at home', () => {
   assert.equal(keyAcc('A', 5), 1);
   // tiny pools fall back to the random walk
   assert.ok(generateMelody({ pool: M.whiteRange('C4', 'D4'), bars: 1, rng: seededRng(1) }).notes.length > 0);
+});
+
+await test('keys: names, scales, tricks', () => {
+  const names = { '-5': 'D♭', '-4': 'A♭', '-3': 'E♭', '-2': 'B♭', '-1': 'F', 0: 'C', 1: 'G', 2: 'D', 3: 'A', 4: 'E', 5: 'B', 6: 'F♯' };
+  for (const [k, n] of Object.entries(names)) assert.equal(K.keyLetter(Number(k)), n);
+  const sc = (k) => K.scaleNotes(k).map((n) => M.noteLabel(n, { octave: false })).join(' ');
+  assert.equal(sc(0), 'C D E F G A B C');
+  assert.equal(sc(1), 'G A B C D E F♯ G');
+  assert.equal(sc(-1), 'F G A B♭ C D E F');
+  assert.equal(sc(5), 'B C♯ D♯ E F♯ G♯ A♯ B');
+  assert.equal(sc(-5), 'D♭ E♭ F G♭ A♭ B♭ C D♭');
+  // every scale climbs: each note higher than the last, 12 keys in all
+  for (let k = -6; k <= 6; k++) {
+    const ms = K.scaleNotes(k).map(M.midiOf);
+    for (let i = 1; i < ms.length; i++) assert.ok(ms[i] > ms[i - 1]);
+    assert.equal(ms[7] - ms[0], 12);
+  }
+  assert.equal(K.minorTwin(0), 'A minor');
+  assert.equal(K.minorTwin(1), 'E minor');
+  assert.equal(K.minorTwin(-5), 'B♭ minor');
+  assert.equal(K.minorTwin(5), 'G♯ minor');
+  assert.match(K.keyTip(2), /C♯.*D/);
+  assert.match(K.keyTip(-3), /B♭.*E♭ major|E♭ major/);
+  assert.deepEqual(K.signatureNotes(3), ['F♯', 'C♯', 'G♯']);
+  assert.equal(K.listText(['F♯', 'C♯', 'G♯']), 'F♯, C♯ and G♯');
+});
+
+await test('lessons: unique ids, valid drills', () => {
+  const ids = new Set();
+  for (const l of LESSONS) {
+    assert.ok(!ids.has(l.id), `duplicate ${l.id}`);
+    ids.add(l.id);
+    assert.ok(UNITS.some((u) => u.id === l.unit), `${l.id} has no unit`);
+    assert.ok(DRILL_MODES.includes(l.drill.mode), `${l.id}: unknown drill ${l.drill.mode}`);
+    if (l.drill.mode === 'scale') assert.equal(l.drill.count, l.drill.keys.length * (l.drill.rounds || 1), `${l.id} count`);
+    for (const c of l.cards) assert.ok(c.title && c.text);
+  }
+  // old ids keep their places (they are save keys)
+  assert.equal(LESSONS[0].id, 'L01');
+  assert.equal(LESSONS[27].id, 'L28');
 });
 
 await test('scoring', () => {

@@ -8,7 +8,10 @@ import { listSongs, addSong, removeSong, sections } from '../core/songs.js';
 import { readSongFile } from '../core/musicxml.js';
 import { noteLabel, midiOf, chordSymbol } from '../core/music.js';
 import { RHYTHM_LEVELS } from '../core/rushlogic.js';
-import { readingPool, rhythmLevel, chordPool, namePool, findLevel, FIND_LEVELS } from '../lessons.js';
+import { readingPool, rhythmLevel, chordPool, namePool, findLevel, keyPool, FIND_LEVELS } from '../lessons.js';
+import { keyLetter } from '../core/keys.js';
+
+const shuffled = (list) => [...list].sort(() => Math.random() - 0.5);
 
 const MAX_RUSH_BARS = 16;
 
@@ -70,7 +73,12 @@ export function buildMix(store) {
   const hasBass = store.lesson('L11').unlocked;
   const clef = hasBass && Math.random() < 0.4 ? 'bass' : 'treble';
   if (!store.lesson('L04').unlocked) steps.push({ type: 'name', pool: namePool(store), count: 6 });
-  else steps.push({ type: 'flash', clef, pool: readingPool(store, clef), count: 6 });
+  else {
+    // once keys are learned, reading sometimes happens in one of them
+    const learnedKeys = keyPool(store).filter((k) => k !== 0);
+    const withKey = learnedKeys.length && clef === 'treble' && Math.random() < 0.4;
+    steps.push({ type: 'flash', clef, pool: readingPool(store, clef), count: 6, ...(withKey ? { keys: learnedKeys } : {}) });
+  }
   if (store.lesson('L09').unlocked) {
     steps.push({ type: 'rush', clef: 'treble', pool: readingPool(store, 'treble'), level: rhythmLevel(store), bars: 1, tempo: store.settings.rushTempo || 60, count: 1 });
   }
@@ -99,6 +107,16 @@ export function renderPractice(app, root) {
   const rushSource = () => {
     const s = g('rushSource', 'melody');
     return s === 'songs' && !listSongs().length ? 'melody' : s;
+  };
+  const keys = keyPool(store);
+  // a saved key choice only counts if that key has been learned here
+  const rushKey = () => {
+    const k = g('rushKey', 0);
+    return k === 'mix' || keys.includes(k) ? k : 0;
+  };
+  const readerKey = () => {
+    const k = g('readerKey', 'mix');
+    return k !== 0 && keys.includes(k) ? k : 'mix';
   };
 
   const drills = [
@@ -136,6 +154,9 @@ export function renderPractice(app, root) {
             ...(listSongs().length ? [{ v: 'songs', label: 'My songs' }] : []),
           ], rushSource(), (v) => { opts.rushSource = v; }),
           h('p', { class: 'muted small' }, '“Melody” lines follow chords like real songs and end on the home note.'),
+          keys.length > 1
+            ? seg('Melody key', [...keys.map((k) => ({ v: k, label: keyLetter(k) })), { v: 'mix', label: 'Mix' }], rushKey(), (v) => { opts.rushKey = v; })
+            : null,
           h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Tempo'),
             h('div', { class: 'stepper' },
               h('button', { class: 'btn btn-round', type: 'button', 'aria-label': 'Slower', onclick: () => setT(-5) }, '−'),
@@ -146,9 +167,40 @@ export function renderPractice(app, root) {
       go: () => {
         const clef = g('rushClef', 'treble');
         const bars = Math.max(1, Math.min(MAX_RUSH_BARS, Number(g('rushBars', 1)) || 1));
-        start('Note Rush', [{ type: 'rush', clef, pool: clef === 'bass' ? bassP : trebleP, level: Math.min(g('rushLevel', rl), rl), bars, tempo: store.settings.rushTempo || 60, count: 4, source: rushSource() }]);
+        const k = rushKey();
+        start('Note Rush', [{ type: 'rush', clef, pool: clef === 'bass' ? bassP : trebleP, level: Math.min(g('rushLevel', rl), rl), bars, tempo: store.settings.rushTempo || 60, count: 4, source: rushSource(), keys: k === 'mix' ? keys : [k] }]);
       },
     },
+    keys.length > 1 ? {
+      id: 'keys', ico: 'flash', title: 'Key reader', text: `Keys: ${keys.map(keyLetter).join(' · ')}`,
+      options: (body) => {
+        body.append(
+          seg('Practise', [{ v: 'read', label: 'Read notes' }, { v: 'scale', label: 'Scales' }, { v: 'name', label: 'Name the key' }], g('keyDrill', 'read'), (v) => { opts.keyDrill = v; }),
+          seg('Key', [{ v: 'mix', label: 'Mix' }, ...keys.filter((k) => k !== 0).map((k) => ({ v: k, label: keyLetter(k) }))], readerKey(), (v) => { opts.readerKey = v; }),
+          seg('Staff (for reading)', [{ v: 'treble', label: 'Treble' }, { v: 'bass', label: 'Bass' }], g('keyClef', 'treble'), (v) => { opts.keyClef = v; }),
+          seg('Length', [{ v: 6, label: 'Short' }, { v: 10, label: 'Normal' }, { v: 16, label: 'Long' }], g('keyCount', 10), (v) => { opts.keyCount = v; }),
+          h('p', { class: 'muted small' }, '“Name the key” needs no keyboard, nice for the train.'),
+        );
+      },
+      go: () => {
+        const k = readerKey();
+        const ks = k === 'mix' ? keys.filter((x) => x !== 0) : [k];
+        const count = g('keyCount', 10);
+        const drill = g('keyDrill', 'read');
+        if (drill === 'scale') {
+          // about one scale per three notes of "Length": 2, 3 or 5 scales
+          const n = Math.max(2, Math.round(count / 3));
+          const mixed = shuffled(ks);
+          const list = Array.from({ length: n }, (_, i) => mixed[i % mixed.length]);
+          start('Scales', [{ type: 'scale', keys: list, rounds: 1, count: n }]);
+        }
+        else if (drill === 'name') start('Name that key', [{ type: 'keyname', keys: k === 'mix' ? keys : [...new Set([0, k, -k])], count }]);
+        else {
+          const clef = g('keyClef', 'treble');
+          start('Key reader', [{ type: 'flash', clef, pool: clef === 'bass' ? bassP : trebleP, keys: ks, count }]);
+        }
+      },
+    } : null,
     {
       id: 'chord', ico: 'chord', title: 'Chord Builder',
       text: chords.slice(0, 6).map(chordSymbol).join(' · ') + (chords.length > 6 ? ' …' : ''),
@@ -195,7 +247,7 @@ export function renderPractice(app, root) {
       h('span', { class: 'mix-sub' }, `About ${Math.max(2, mixSteps.length + 1)} minutes, a little of everything you know`)),
     icon('play', 'mix-play'));
 
-  const grid = h('div', { class: 'drill-grid' }, drills.map((d) =>
+  const grid = h('div', { class: 'drill-grid' }, drills.filter(Boolean).map((d) =>
     h('button', {
       class: `drill-card d-${d.id}`,
       type: 'button',

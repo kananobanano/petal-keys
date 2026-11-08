@@ -3,12 +3,18 @@
 Gentle piano lessons for your USB MIDI keyboard, or the keys on screen.
 Read music, build chords and train your ears, one short lesson at a time.
 
-- **Learn**: 28 Duolingo-style lessons in 8 units (keyboard map, treble clef,
-  Note Rush, bass clef, chords, ear training, sharps & flats, seventh chords).
-  Each lesson has a few teaching cards and one drill.
+- **Learn**: 38 Duolingo-style lessons in 9 units (keyboard map, treble clef,
+  Note Rush, bass clef, chords, ear training, sharps & flats, seventh chords,
+  keys & key signatures). Each lesson has a few teaching cards and one drill.
+- **Keys & key signatures**: play scales from C up to five sharps (B major)
+  and five flats (D♭ major), read notes with a key signature (with a gentle
+  reminder if you forget the sharp or flat), name a key from its signature
+  with easy tricks, and meet the minor twin of every key.
 - **Practice**: only things you have already learned, for tired evenings.
-  Mix for me, Read notes, Note Rush, Chord Builder, Find the note,
-  Higher or lower, Find the key and Free play.
+  Mix for me, Read notes, Note Rush, Key reader (read notes, scales or name
+  the key, in the keys you've learned), Chord Builder, Find the note,
+  Higher or lower, Find the key and Free play. Note Rush melodies can use
+  your learned keys too.
 - **Note Rush**: look at a short line for as long as you like, tap Go, hear
   four clicks, then play along with the moving line. You get a score for the
   right notes and a separate score for timing (Perfect / Great / Good).
@@ -21,7 +27,9 @@ Read music, build chords and train your ears, one short lesson at a time.
   **Wait** mode waits on each note until you play it (with key hints);
   **Play along** gives a count-in and scores notes and timing. Choose a part
   (about 4 bars, or **Choose bars…** for any From–To range), the hand (for
-  two-staff piano music) and the tempo.
+  two-staff piano music) and the tempo. Songs with sharps or flats in the key
+  signature get a **Key reminder**: a small lavender ♯ or ♭ beside every note
+  the key signature changes.
   Note Rush can also take its lines from your songs ("Lines from: My songs").
 - **Instruments**: grand piano, electric piano, music box, marimba, organ,
   soft synth or dreamy pad (Me → Settings, or the picker in Free play).

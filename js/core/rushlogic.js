@@ -2,6 +2,7 @@
 
 import { midiOf, pc } from './music.js';
 import { weightedChoice } from './util.js';
+import { keyAcc, tonicIndex } from './keys.js';
 
 // Rhythm tokens (in beats): w whole, dh dotted half, h half, dq dotted
 // quarter, q quarter, e eighth, r quarter rest, hr half rest.
@@ -105,18 +106,7 @@ export function generatePassage({ pool, bars = 1, level = 1, weightOf = () => 1,
 // echoing bar 1, and the last note landing on the home note.
 
 const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
-const SHARP_ORDER = 'FCGDAEB';
-const FLAT_ORDER = 'BEADGCF';
-
-/** The sharp/flat a key signature (in fifths) gives to a letter. */
-export function keyAcc(letter, key = 0) {
-  if (key > 0) return SHARP_ORDER.slice(0, key).includes(letter) ? 1 : 0;
-  if (key < 0) return FLAT_ORDER.slice(0, -key).includes(letter) ? -1 : 0;
-  return 0;
-}
-
-/** Index in LETTERS of the major key's home note (0 = C, 4 = G…). */
-const tonicIndex = (key) => (((key * 4) % 7) + 7) % 7;
+export { keyAcc };
 
 /** Chord progressions as scale steps from home (0 = I, 4 = V, 5 = vi…). */
 export const PROGRESSIONS = [

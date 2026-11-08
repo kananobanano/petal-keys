@@ -885,6 +885,11 @@ body.in-exercise .toasts { top: calc(64px + env(safe-area-inset-top, 0px)); bott
 .hint-notes { margin: 0; font: 700 16px var(--font-body); color: var(--lav-ink); }
 .switch-row { position: relative; display: inline-flex; align-items: center; gap: 10px; font: 700 14px var(--font-body); color: var(--ink-2); cursor: pointer; padding: 6px 4px; }
 .choice-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin: 8px 0; }
+.choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 150px)); justify-content: center; gap: 12px; margin: 6px 0; width: 100%; }
+.choice-grid .btn-choice { min-width: 0; min-height: 76px; padding: 10px 12px; font-size: 24px; gap: 2px; }
+.choice-sub { font: 700 12.5px var(--font-body); color: var(--ink-2); }
+.btn-choice.right .choice-sub { color: inherit; }
+.keysig-card { display: flex; justify-content: center; }
 .ear-art { display: flex; align-items: flex-end; gap: 7px; height: 46px; }
 .ear-art i { width: 10px; height: 100%; border-radius: 6px; background: var(--sky); transform-origin: bottom; animation: eq 1.1s ease-in-out infinite alternate; }
 .ear-art i:nth-child(2) { background: var(--lav); animation-delay: -0.4s; }
@@ -1056,6 +1061,7 @@ body.in-exercise .toasts { top: calc(64px + env(safe-area-inset-top, 0px)); bott
 .staff-svg .j-great { fill: var(--sky-ink); }
 .staff-svg .j-early, .staff-svg .j-late { fill: var(--gold-ink); }
 .staff-svg .note-name { font: 700 12.5px var(--font-body); fill: var(--lav-ink); }
+.staff-svg .key-hint { fill: var(--lav-ink); opacity: 0.75; }
 .staff-svg .playhead { stroke: var(--mint); stroke-linecap: round; opacity: 0.95; }
 
 @media (prefers-reduced-motion: reduce) {

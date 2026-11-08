@@ -9,6 +9,7 @@ import { generatePassage, generateMelody, scoreAttempt, matchWindow, judgeTiming
 import { button, clefKey, rangeOf, poolExtent, matchesNote } from './common.js';
 import { songPassage } from '../core/songs.js';
 import { toast } from '../ui/overlay.js';
+import { keyName, signatureNotes, listText } from '../core/keys.js';
 
 export function createRush(ctx, cfg) {
   const { store, kb, audio } = ctx;
@@ -88,13 +89,17 @@ export function createRush(ctx, cfg) {
           : 'No song has a fitting line on this staff yet, so here is a melody instead.', { ms: 4200 });
       }
     }
-    if (!passage && (cfg.source === 'melody' || cfg.source === 'songs')) passage = generateMelody({ pool, bars, level, key: cfg.key || 0, weightOf });
+    if (!passage && (cfg.source === 'melody' || cfg.source === 'songs')) {
+      const key = cfg.keys && cfg.keys.length ? cfg.keys[Math.floor(Math.random() * cfg.keys.length)] : cfg.key || 0;
+      passage = generateMelody({ pool, bars, level, key, weightOf });
+    }
     if (!passage) passage = generatePassage({ pool, bars, level, weightOf });
     for (const n of passage.notes) n.ev = n.ev || n.id;
     if (passage.range) kb.focus(passage.range[0], passage.range[1]);
     attempt = 0;
     toStudy();
     if (passage.from) ctx.feedback(`From “${passage.from}”. Take your time, then tap Go.`, 'info');
+    else if (passage.key) ctx.feedback(`${keyName(passage.key)}: remember ${listText(signatureNotes(passage.key))}. Take your time, then tap Go.`, 'info');
   }
 
   function toStudy() {

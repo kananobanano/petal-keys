@@ -123,11 +123,12 @@ js/core/
   keyboard.js         on-screen piano (multi-touch, glissando, latch, octave shift)
   store.js            progress save format, merge, streak, export/import encoding
   rushlogic.js        Note Rush passage generation + timing/notes scoring
+  keys.js             major keys: signatures, scales, key names, naming tricks
   musicxml.js         MusicXML (.musicxml/.xml/.mxl) reader
   songs.js            song library (localStorage), sections, buildView, song lines for Note Rush
 js/modes/             one file per drill; registered in modes/index.js
   name.js flash.js rush.js chords.js higherlower.js findnote.js
-  freeplay.js calibrate.js song.js common.js
+  freeplay.js calibrate.js song.js scale.js keyname.js common.js
 js/ui/
   session.js          runs a session: teaching cards → drill(s) → results screen
   learn.js            Learn tab (lesson path)
@@ -156,7 +157,7 @@ js/ui/
 - **Sessions:** `app.startSession({ title, kind, steps, lessonId })`; steps are
   `{ type: 'cards', cards }` or `{ type: <mode>, ...cfg }`. Kinds: `lesson`
   (gives stars), `practice`, `free`, `calib`.
-- **Lessons** (`js/lessons.js`): 28 lessons in units A–H, each with teaching
+- **Lessons** (`js/lessons.js`): 38 lessons in units A–I, each with teaching
   `cards` (`title`, `text`, optional `visual`) and one `drill`. Practice pools
   are derived from lessons the user has reached, so Practice never shows
   untaught material. To add a unit: add to `UNITS`, append lessons with new
@@ -222,6 +223,27 @@ notes), no grace notes, max two staves, no lyrics/dynamics/slurs.
   measure indices). Bests for chosen ranges live in the device-only song pref
   (`pref.cbest`), not in the backup, so backups stay tiny.
 
+### Keys & key signatures (unit I, lessons L29–L38)
+
+- `js/core/keys.js`: keys are numbers of fifths (1 = G, -5 = D♭).
+  `keyAcc`, `keyName`/`keyLetter`, `scaleNotes`, `signatureNotes`, `minorTwin`,
+  `keyTip` (the naming tricks), `blackKeyHint` (keyboard-anchored wording).
+- Drills: `scale` (play the scale, cursor waits, hints on round 1 and after a
+  slip; `count` must equal keys × rounds), `keyname` (pick the major key from
+  a signature; `minor: true` also names the minor twin), and `flash` with
+  `key`/`keys` (notes respelled in the key; "So close!" reminder when she plays
+  the plain letter). Note Rush takes `keys` for melody lines.
+- Lessons go C, G, read in G, F, name-that-key, D/A, B♭/E♭, E/B, A♭/D♭, then
+  minor twins (Minty's songs reach 5 sharps/flats, incl. D♭).
+- Practice: `keyPool(store)` = keys from reached `scale`/keyed `flash` lessons.
+  "Key reader" card (read / scales / name the key) shows once a key besides C
+  is learned; Note Rush gets a "Melody key" choice; Mix sometimes reads in a key.
+- Song Mode "Key reminder" (`pref.keyHints`, default on, only for songs with a
+  key signature) uses `renderStaff(..., { keyHints: true })`: a lavender ♯/♭
+  (`.key-hint`) on notes the signature changes.
+- Free-layout staves (flash cards, lesson pictures) now respect `score.key`;
+  lesson `staff` visuals accept `key`.
+
 ### Note Rush lines
 
 - Practice lets the user pick 1–16 bars (`MAX_RUSH_BARS` in `practice.js`).
@@ -236,40 +258,14 @@ notes), no grace notes, max two staves, no lyrics/dynamics/slurs.
 
 ## Things Minty has asked for that are not done yet
 
-1. **Key signatures unit (next up, agreed in principle, not built).** Minty is
-   confused by key signatures and wants a whole section. Proposed plan (check
-   with her before building):
-   - New unit "Keys & key signatures" with lessons:
-     1. Home sweet C: play the C major scale, feel the "home" note.
-     2. G major's one sharp: discover F must become F♯; meet the ♯ in the key
-        signature ("a standing instruction: every F is F♯").
-     3. Remember the sharp: read notes with a G major key signature; gentle
-        reminder when she plays F instead of F♯.
-     4. F major's one flat (B♭).
-     5. Name that key: see a signature, pick the key (tricks: sharps → one key
-        above the last sharp; flats → second-to-last flat; order of flats
-        B E A D G C F, sharps F C G D A E B; no sharps/flats = C).
-     6. More sharps and flats: D, B♭, and on to **5+ sharps and flats** (B major,
-        D♭ major). Minty has songs with ~5 sharps and one in D♭, so the unit
-        must go that far, not stop at 1–2.
-   - `rushlogic.generateMelody({ key })` already spells notes in any key and
-     ends on that key's home note; Note Rush passes `cfg.key` through. Use it
-     for key-signature melody drills.
-   - Practice: a "Key reader" drill (like Read notes, with key signatures).
-   - Song Mode: optional "key reminder" that marks notes changed by the key
-     signature with a small ♯/♭ hint.
-   - Mention that every signature is shared by a major and a relative minor
-     key; the app currently always names the major key.
-   - Needs: a scale-play drill, a "name the key" multiple-choice drill, and the
-     `flash` drill to accept a `key` (the renderer already supports `score.key`).
-2. **More "not just drills" learning.** Minty said there's a lot she needs to
+1. **More "not just drills" learning.** Minty said there's a lot she needs to
    learn beyond drills (theory, how things work). Ask her what topics; good
    candidates: scales, intervals, counting rhythm, reading both hands, hand
    position/fingering, chord progressions in J-pop.
-3. **MIDI file import** with a MIDI → notation converter (quantise timing, find
+2. **MIDI file import** with a MIDI → notation converter (quantise timing, find
    bars from tempo/time signature, split hands at middle C, spell sharps/flats
    from the key).
-4. **Later shelf:** rhythm tap drill (low priority, she's good at rhythm), PDF
+3. **Later shelf:** rhythm tap drill (low priority, she's good at rhythm), PDF
    import (would need OMR; an LLM could act as a checker), triplet drawing.
 
 Minty mostly practises J-pop / anime / Vocaloid-style songs; her first song was

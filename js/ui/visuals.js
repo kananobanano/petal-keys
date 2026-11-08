@@ -10,7 +10,8 @@ export function miniKeys({ from = 'C4', to = 'B4', marks = {}, labels = null, fa
   const hi = midiOf(parseNote(to));
   const markOf = new Map();
   for (const [cls, list] of Object.entries(marks)) for (const n of list) markOf.set(midiOf(parseNote(n)), cls);
-  const labelSet = Array.isArray(labels) ? new Set(labels.map((n) => midiOf(parseNote(n)))) : null;
+  // labels keep their spelling (B♭ stays B♭, not A♯)
+  const labelSet = Array.isArray(labels) ? new Map(labels.map((n) => [midiOf(parseNote(n)), noteLabel(parseNote(n), { octave: false })])) : null;
   const whites = [];
   for (let m = lo; m <= hi; m++) if (!isBlack(m)) whites.push(m);
   const keys = h('div', { class: 'kb-keys mini', style: `--n:${whites.length}` });
@@ -18,7 +19,7 @@ export function miniKeys({ from = 'C4', to = 'B4', marks = {}, labels = null, fa
   const lbl = (m) => {
     if (labels === 'all') return isBlack(m) ? '' : midiLabel(m).replace(/\d/, '');
     if (labels === 'black') return isBlack(m) ? `${midiLabel(m).slice(0, 2)}\n${midiLabel(m, 'flat').slice(0, 2)}` : '';
-    if (labelSet && labelSet.has(m)) return midiLabel(m).replace(/-?\d/, '');
+    if (labelSet && labelSet.has(m)) return labelSet.get(m);
     return '';
   };
   whites.forEach((m, i) => {
@@ -91,7 +92,9 @@ export function cardVisual(v) {
       parts.push(staffBox(score, { maxSpace: 11 }));
     } else {
       const score = ns.length ? rowScore(ns.map((n) => [n]), v.staff.clef) : { clef: v.staff.clef, time: null, measures: [{ events: [] }] };
-      parts.push(staffBox(score, { free: true, center: true, noteNames: !!v.staff.names, maxSpace: 13, extent: { [v.staff.clef]: [-3, 11] } }));
+      score.key = v.staff.key || 0;
+      const many = ns.length > 5;
+      parts.push(staffBox(score, { free: true, center: true, noteNames: !!v.staff.names, maxSpace: 13, freeAdvance: many ? 3.2 : undefined, extent: { [v.staff.clef]: [-3, 11] } }));
     }
   }
   if (v.keys) parts.push(miniKeys(v.keys));
