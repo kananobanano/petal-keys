@@ -5,7 +5,7 @@
 import { h } from '../core/util.js';
 import { parseNote, spell, noteLabel, midiOf } from '../core/music.js';
 import { renderStaff, staffPos } from '../core/staff.js';
-import { generatePassage, scoreAttempt, matchWindow, judgeTiming } from '../core/rushlogic.js';
+import { generatePassage, generateMelody, scoreAttempt, matchWindow, judgeTiming } from '../core/rushlogic.js';
 import { button, clefKey, rangeOf, poolExtent, matchesNote } from './common.js';
 import { songPassage } from '../core/songs.js';
 import { toast } from '../ui/overlay.js';
@@ -39,6 +39,7 @@ export function createRush(ctx, cfg) {
   let lastDraw = {};
   let listenTimer = 0;
   let warnedNoSong = false;
+  let followedRow = -1;
 
   // ----- DOM -----
   const staffEl = h('div', { class: 'staff-inner' });
@@ -77,14 +78,18 @@ export function createRush(ctx, cfg) {
 
   function newPassage() {
     passage = null;
+    const weightOf = (n) => store.weight(keyOf(midiOf(n)));
     if (cfg.source === 'songs') {
       passage = songPassage({ clef, bars });
       if (!passage && !warnedNoSong) {
         warnedNoSong = true;
-        toast('No song has a fitting line on this staff yet, so here is a new one.');
+        toast(bars > 1
+          ? `No song has a ${bars}-bar line on this staff that fits, so here is a melody instead.`
+          : 'No song has a fitting line on this staff yet, so here is a melody instead.', { ms: 4200 });
       }
     }
-    if (!passage) passage = generatePassage({ pool, bars, level, weightOf: (n) => store.weight(keyOf(midiOf(n))) });
+    if (!passage && (cfg.source === 'melody' || cfg.source === 'songs')) passage = generateMelody({ pool, bars, level, key: cfg.key || 0, weightOf });
+    if (!passage) passage = generatePassage({ pool, bars, level, weightOf });
     for (const n of passage.notes) n.ev = n.ev || n.id;
     if (passage.range) kb.focus(passage.range[0], passage.range[1]);
     attempt = 0;
@@ -129,6 +134,8 @@ export function createRush(ctx, cfg) {
     endBeat = Math.max(passage.beats, lastNote.absBeat + win / msPerBeat) + 0.15;
     scoreBox.hidden = true;
     draw();
+    followedRow = -1;
+    followRow(0);
     beatDots.classList.add('on');
     ctx.feedback('Listen to the four clicks…', 'info');
     ctx.setActions(button('Stop', { kind: 'ghost', onclick: () => stop() }));
@@ -157,6 +164,7 @@ export function createRush(ctx, cfg) {
         ctx.feedback('Play!', 'info');
       }
       layout.setPlayhead(Math.min(beat, passage.beats));
+      followRow(Math.min(beat, passage.beats));
     }
     if (beat >= endBeat) {
       finish();
@@ -165,9 +173,23 @@ export function createRush(ctx, cfg) {
     raf = requestAnimationFrame(tick);
   }
 
-  function popJudge(j, id) {
+  /** Keep the row being played in view when a long line wraps. */
+  function followRow(beat) {
+    if (!layout) return;
+    const { system } = layout.beatToX(beat);
+    if (system === followedRow) return;
+    followedRow = system;
+    const top = layout.systemTop(system) + staffEl.offsetTop;
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (top < staffCard.scrollTop || top + layout.systemHeight > staffCard.scrollTop + staffCard.clientHeight) {
+      staffCard.scrollTo({ top: Math.max(0, top - 6), behavior: reduce ? 'auto' : 'smooth' });
+    }
+  }
+
+  function popJudge(j, id, beat) {
     if (!layout || layout.eventX[id] == null) return;
-    const el = h('span', { class: `pop j-${j.cls}`, style: `left:${layout.eventX[id] + staffEl.offsetLeft}px` }, j.label);
+    const top = layout.systemTop(layout.beatToX(beat).system) + 4;
+    const el = h('span', { class: `pop j-${j.cls}`, style: `left:${layout.eventX[id] + staffEl.offsetLeft}px;top:${top}px` }, j.label);
     popLayer.append(el);
     setTimeout(() => el.remove(), 900);
   }
@@ -197,6 +219,7 @@ export function createRush(ctx, cfg) {
       if (r.hit && !judgements[ev]) judgements[ev] = { label: r.label, cls: r.cls };
     });
     draw({ states, judgements, ghosts });
+    if (staffCard.scrollTop > 0) staffCard.scrollTo({ top: 0, behavior: 'smooth' });
 
     if (attempt === 1) ctx.record({ correct: res.combined >= 70, xp: Math.round(res.combined / 10) });
     else ctx.addXp(res.combined >= 70 ? 2 : 1);
@@ -261,10 +284,14 @@ export function createRush(ctx, cfg) {
     for (const n of passage.notes) audio.playNote(n.midi, { when: t0 + n.absBeat * beatSec, dur: n.dur * beatSec * 0.92, vel: 0.7 });
     const startP = audio.perfTimeOf(t0);
     const mpb = beatSec * 1000;
+    followedRow = -1;
     const step = () => {
       if (!ctx.isOpen() || phase !== 'listen') return;
       const beat = (performance.now() - startP) / mpb;
-      if (beat >= 0) layout.setPlayhead(Math.min(beat, passage.beats));
+      if (beat >= 0) {
+        layout.setPlayhead(Math.min(beat, passage.beats));
+        followRow(Math.min(beat, passage.beats));
+      }
       if (beat > passage.beats) {
         layout.setPlayhead(null);
         phase = prevPhase;
@@ -310,7 +337,7 @@ export function createRush(ctx, cfg) {
         const states = {};
         for (const id of live.keys()) states[expected.find((x) => x.id === id).ev] = 'good';
         draw({ states });
-        popJudge(j, best.ex.ev);
+        popJudge(j, best.ex.ev, (best.ex.t - startPerf - calib) / msPerBeat);
       } else {
         kb.mark(e.midi, 'bad', 250);
       }

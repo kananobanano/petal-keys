@@ -10,6 +10,8 @@ import { noteLabel, midiOf, chordSymbol } from '../core/music.js';
 import { RHYTHM_LEVELS } from '../core/rushlogic.js';
 import { readingPool, rhythmLevel, chordPool, namePool, findLevel, FIND_LEVELS } from '../lessons.js';
 
+const MAX_RUSH_BARS = 16;
+
 function poolText(pool) {
   const sorted = [...pool].sort((a, b) => midiOf(a) - midiOf(b));
   return `${sorted.length} notes, ${noteLabel(sorted[0])} to ${noteLabel(sorted[sorted.length - 1])}`;
@@ -36,6 +38,31 @@ function seg(label, options, value, onChange) {
   });
   group.append(...btns);
   return h('div', { class: 'field' }, h('span', { class: 'field-label', id }, label), group);
+}
+
+/** A number you can type or nudge with − and +. */
+function numField(label, value, min, max, unit, onChange) {
+  const id = 'num-' + label.toLowerCase().replace(/\W+/g, '-');
+  let v = value;
+  const input = h('input', { class: 'num-in', id, type: 'number', inputmode: 'numeric', min: String(min), max: String(max), step: '1', value: String(v) });
+  const unitEl = h('span', { class: 'num-unit' });
+  const minus = h('button', { class: 'btn btn-round', type: 'button', 'aria-label': `Fewer ${unit}s`, onclick: () => set(v - 1) }, '−');
+  const plus = h('button', { class: 'btn btn-round', type: 'button', 'aria-label': `More ${unit}s`, onclick: () => set(v + 1) }, '+');
+  function set(n, fromTyping = false) {
+    if (!Number.isFinite(n)) n = v;
+    v = Math.max(min, Math.min(max, Math.round(n)));
+    if (!fromTyping || String(v) !== input.value.trim()) input.value = String(v);
+    unitEl.textContent = v === 1 ? unit : `${unit}s`;
+    minus.disabled = v <= min;
+    plus.disabled = v >= max;
+    onChange(v);
+  }
+  input.addEventListener('input', () => { if (input.value !== '') set(Number(input.value), true); });
+  input.addEventListener('change', () => set(Number(input.value)));
+  input.addEventListener('focus', () => input.select());
+  set(v);
+  return h('div', { class: 'field' }, h('label', { class: 'field-label', for: id }, label),
+    h('div', { class: 'stepper' }, minus, h('span', { class: 'num-wrap' }, input, unitEl), plus));
 }
 
 export function buildMix(store) {
@@ -68,6 +95,11 @@ export function renderPractice(app, root) {
   const bestHl = store.best('hl:level');
 
   const start = (title, steps, kind = 'practice') => app.startSession({ title, steps, kind });
+  // "My songs" only makes sense while there are songs on this device
+  const rushSource = () => {
+    const s = g('rushSource', 'melody');
+    return s === 'songs' && !listSongs().length ? 'melody' : s;
+  };
 
   const drills = [
     {
@@ -97,10 +129,13 @@ export function renderPractice(app, root) {
         body.append(
           seg('Staff', [{ v: 'treble', label: 'Treble' }, { v: 'bass', label: 'Bass' }], g('rushClef', 'treble'), (v) => { opts.rushClef = v; }),
           seg('Rhythms', Object.entries(RHYTHM_LEVELS).filter(([k]) => Number(k) <= Math.max(rl, 1)).map(([k, v]) => ({ v: Number(k), label: v.name })), Math.min(g('rushLevel', rl), rl), (v) => { opts.rushLevel = v; }),
-          seg('Line length', [{ v: 1, label: '1 bar' }, { v: 2, label: '2 bars' }], g('rushBars', 1), (v) => { opts.rushBars = v; }),
-          listSongs().length
-            ? seg('Lines from', [{ v: 'new', label: 'New lines' }, { v: 'songs', label: 'My songs' }], g('rushSource', 'new'), (v) => { opts.rushSource = v; })
-            : null,
+          numField('Line length', g('rushBars', 1), 1, MAX_RUSH_BARS, 'bar', (v) => { opts.rushBars = v; }),
+          seg('Lines from', [
+            { v: 'melody', label: 'Melody' },
+            { v: 'new', label: 'Random' },
+            ...(listSongs().length ? [{ v: 'songs', label: 'My songs' }] : []),
+          ], rushSource(), (v) => { opts.rushSource = v; }),
+          h('p', { class: 'muted small' }, '“Melody” lines follow chords like real songs and end on the home note.'),
           h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Tempo'),
             h('div', { class: 'stepper' },
               h('button', { class: 'btn btn-round', type: 'button', 'aria-label': 'Slower', onclick: () => setT(-5) }, '−'),
@@ -110,7 +145,8 @@ export function renderPractice(app, root) {
       },
       go: () => {
         const clef = g('rushClef', 'treble');
-        start('Note Rush', [{ type: 'rush', clef, pool: clef === 'bass' ? bassP : trebleP, level: Math.min(g('rushLevel', rl), rl), bars: g('rushBars', 1), tempo: store.settings.rushTempo || 60, count: 4, source: g('rushSource', 'new') }]);
+        const bars = Math.max(1, Math.min(MAX_RUSH_BARS, Number(g('rushBars', 1)) || 1));
+        start('Note Rush', [{ type: 'rush', clef, pool: clef === 'bass' ? bassP : trebleP, level: Math.min(g('rushLevel', rl), rl), bars, tempo: store.settings.rushTempo || 60, count: 4, source: rushSource() }]);
       },
     },
     {

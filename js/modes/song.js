@@ -26,8 +26,14 @@ export function createSong(ctx, cfg) {
   const secs = sections(song);
   const two = song.staves.length > 1;
   const prefKey = `song:${entry.id}`;
-  const pref = { sec: secs.length > 1 ? 1 : 0, hand: 'right', mode: 'wait', hints: true, names: false, tempo: null, ...(store.getLocal(prefKey) || {}) };
-  if (pref.sec >= secs.length) pref.sec = 0;
+  const lastBar = song.measures.length - 1;
+  const pref = { sec: secs.length > 1 ? 1 : 0, hand: 'right', mode: 'wait', hints: true, names: false, tempo: null, from: 0, to: Math.min(3, lastBar), ...(store.getLocal(prefKey) || {}) };
+  if (pref.sec !== 'custom' && !(pref.sec >= 0 && pref.sec < secs.length)) pref.sec = 0;
+  pref.from = Math.max(0, Math.min(lastBar, Number(pref.from) || 0));
+  pref.to = Math.max(pref.from, Math.min(lastBar, Number(pref.to) || 0));
+  const isCustom = () => pref.sec === 'custom';
+  /** The bars being practised: a ready-made part, or the From–To you chose. */
+  const curRange = () => (isCustom() ? { from: pref.from, to: pref.to } : secs[pref.sec]);
   const savePref = () => store.setLocal(prefKey, pref);
   const defaultTempo = Math.max(40, Math.min(120, Math.round(((song.tempo || 100) * 0.6) / 5) * 5));
   if (!pref.tempo) pref.tempo = defaultTempo;
@@ -56,8 +62,34 @@ export function createSong(ctx, cfg) {
   const staffEl = h('div', { class: 'staff-inner' });
   const card = h('div', { class: 'staff-card song-card' }, staffEl);
   const summary = h('div', { class: 'score-box', hidden: true });
-  const secSel = h('select', { class: 'select', id: 'song-sec', 'aria-label': 'Part of the song', onchange: (e) => { pref.sec = Number(e.target.value); savePref(); reset(); } },
-    secs.map((sc, i) => h('option', { value: String(i), selected: i === pref.sec }, sc.label)));
+  const secSel = h('select', { class: 'select', id: 'song-sec', 'aria-label': 'Part of the song', onchange: (e) => {
+    pref.sec = e.target.value === 'custom' ? 'custom' : Number(e.target.value);
+    rangeRow.hidden = !isCustom();
+    savePref();
+    reset();
+  } },
+  secs.map((sc, i) => h('option', { value: String(i), selected: i === pref.sec }, sc.label)),
+  h('option', { value: 'custom', selected: isCustom() }, 'Choose bars…'));
+  const barOptions = (sel) => song.measures.map((m, i) => h('option', { value: String(i), selected: i === sel }, String(m.label)));
+  const fromSel = h('select', { class: 'select', id: 'song-from', onchange: (e) => setRange(Number(e.target.value), null) }, barOptions(pref.from));
+  const toSel = h('select', { class: 'select', id: 'song-to', onchange: (e) => setRange(null, Number(e.target.value)) }, barOptions(pref.to));
+  const rangeRow = h('div', { class: 'song-tools song-range', hidden: !isCustom() },
+    h('label', { for: 'song-from' }, 'Bars'), fromSel, h('label', { for: 'song-to' }, 'to'), toSel);
+
+  function setRange(from, to) {
+    if (from != null) {
+      pref.from = from;
+      if (pref.to < from) pref.to = from;
+    }
+    if (to != null) {
+      pref.to = to;
+      if (pref.from > to) pref.from = to;
+    }
+    fromSel.value = String(pref.from);
+    toSel.value = String(pref.to);
+    savePref();
+    reset();
+  }
   const handSel = two
     ? h('select', { class: 'select', id: 'song-hand', 'aria-label': 'Hand', onchange: (e) => { pref.hand = e.target.value; savePref(); reset(); } },
       [['right', 'Right hand'], ['left', 'Left hand'], ['both', 'Both hands']].map(([v, l]) => h('option', { value: v, selected: v === pref.hand }, l)))
@@ -315,8 +347,19 @@ export function createSong(ctx, cfg) {
       draw(Object.fromEntries(view.steps.map((s) => [s.ev, 'good'])), {});
       layout.setPlayhead(null);
     }
-    const key = `song:${entry.id}:${pref.sec}:${pref.hand}:${pref.mode}`;
-    const isBest = store.setBest(key, score) && score > 0;
+    let isBest;
+    if (isCustom()) {
+      // Chosen ranges keep their best on this device only, so backups stay tiny.
+      const ck = `${pref.from}-${pref.to}:${pref.hand}:${pref.mode}`;
+      pref.cbest = pref.cbest || {};
+      isBest = score > 0 && score > (pref.cbest[ck] ?? -1);
+      if (isBest) {
+        pref.cbest[ck] = score;
+        savePref();
+      }
+    } else {
+      isBest = store.setBest(`song:${entry.id}:${pref.sec}:${pref.hand}:${pref.mode}`, score) && score > 0;
+    }
     const xp = Math.max(2, Math.round(view.steps.length / 4));
     if (runs === 1) {
       ctx.record({ correct: score >= 80, xp });
@@ -339,7 +382,7 @@ export function createSong(ctx, cfg) {
     }
     const msg = score >= 90 ? 'Beautiful! Ready to try it faster, or the next part?' : score >= 70 ? 'Lovely! One more time makes it stick.' : 'Nice effort. Go again slowly, it gets easier each time.';
     ctx.feedback(msg, score >= 70 ? 'good' : 'hint');
-    const nextSec = pref.sec > 0 && pref.sec < secs.length - 1;
+    const nextSec = !isCustom() && pref.sec > 0 && pref.sec < secs.length - 1;
     const acts = [button('Again', { kind: 'ghost', ico: 'replay', onclick: () => restart() })];
     if (nextSec) acts.push(button('Next part', { kind: 'ghost', onclick: () => { pref.sec++; secSel.value = String(pref.sec); savePref(); reset(); } }));
     if (pref.mode === 'wait' && score >= 70) acts.push(button('Play along', { kind: 'ghost', onclick: () => { pref.mode = 'play'; modeBtns.forEach((b, i) => b.setAttribute('aria-checked', String(i === 1))); savePref(); reset(); } }));
@@ -440,7 +483,7 @@ export function createSong(ctx, cfg) {
     cancelAnimationFrame(raf);
     audio.releaseAll();
     kb.clearMarks();
-    const sc = secs[pref.sec];
+    const sc = curRange();
     view = buildView(song, { staffIdx: staffIdx(), from: sc.from, to: sc.to });
     lastStates = {};
     lastExtra = {};
@@ -453,7 +496,7 @@ export function createSong(ctx, cfg) {
   return {
     mount() {
       ctx.setTitle(song.title);
-      ctx.body.append(h('div', { class: 'prompt-block song' }, toolbar, toggles, card, summary));
+      ctx.body.append(h('div', { class: 'prompt-block song' }, toolbar, rangeRow, toggles, card, summary));
       requestAnimationFrame(() => reset());
       if (typeof ResizeObserver === 'function') {
         let last = 0;

@@ -88,6 +88,10 @@ node tools/build.mjs             # REQUIRED after changing any file: regenerates
   Not needed for GitHub Pages.
 - `tools/staff-test.html` renders sample scores; open it to eyeball the
   sheet-music renderer after changing `staff.js`.
+- On Minty's Windows PC, Node is installed but a fresh shell may need PATH
+  refreshed; Playwright isn't installed, and the Chrome extension may not be
+  connected. A headless Edge driven over CDP works without downloads; pass
+  `--mute-audio` or Minty hears the test playing through her speakers.
 - `tools/e2e/` has Playwright (Python) scripts used for browser testing. They
   expect the app served on port 8765 and write screenshots to `/tmp`. They
   drive the app through `window.__petalKeys` (the app object) and fake MIDI via
@@ -214,6 +218,21 @@ notes), no grace notes, max two staves, no lyrics/dynamics/slurs.
   (`store.local.restartTrigger`, handled in `MidiInput._onMessage`); works on
   the results screen too, for looping a lick.
 - Note Rush can take lines from songs ("Lines from: My songs").
+- Song Mode "Choose bars…" (`pref.sec === 'custom'`, `pref.from/to` are
+  measure indices). Bests for chosen ranges live in the device-only song pref
+  (`pref.cbest`), not in the backup, so backups stay tiny.
+
+### Note Rush lines
+
+- Practice lets the user pick 1–16 bars (`MAX_RUSH_BARS` in `practice.js`).
+  Long lines wrap; the card scrolls to follow the playhead.
+- Sources: `melody` (`generateMelody`: one chord per bar from `PROGRESSIONS`,
+  incl. the J-pop "royal road" IV–V–iii–vi; chord notes on strong beats, steps
+  between, bar 3 of each phrase echoes bar 1, ends V–I or IV–I on the home
+  note), `new` (random walk, `generatePassage`), `songs`. Lessons and Mix
+  still use the random walk.
+- Minty wants chord progressions as a topic later: showing chord names above
+  melody lines, a progression drill in Chord Builder, and a short lesson.
 
 ## Things Minty has asked for that are not done yet
 
@@ -230,8 +249,12 @@ notes), no grace notes, max two staves, no lyrics/dynamics/slurs.
      5. Name that key: see a signature, pick the key (tricks: sharps → one key
         above the last sharp; flats → second-to-last flat; order of flats
         B E A D G C F, sharps F C G D A E B; no sharps/flats = C).
-     6. More sharps and flats: D, B♭, up to D♭ (5 flats; her song list showed
-        "key of D♭").
+     6. More sharps and flats: D, B♭, and on to **5+ sharps and flats** (B major,
+        D♭ major). Minty has songs with ~5 sharps and one in D♭, so the unit
+        must go that far, not stop at 1–2.
+   - `rushlogic.generateMelody({ key })` already spells notes in any key and
+     ends on that key's home note; Note Rush passes `cfg.key` through. Use it
+     for key-signature melody drills.
    - Practice: a "Key reader" drill (like Read notes, with key signatures).
    - Song Mode: optional "key reminder" that marks notes changed by the key
      signature with a small ♯/♭ hint.

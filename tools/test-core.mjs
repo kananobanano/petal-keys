@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import * as M from '../js/core/music.js';
 import { mergeSaves, computeStreak, newSave, encodeSave, decodeSave, migrate } from '../js/core/store.js';
-import { generatePassage, scoreAttempt, matchWindow, RHYTHM_LEVELS } from '../js/core/rushlogic.js';
+import { generatePassage, generateMelody, keyAcc, scoreAttempt, matchWindow, RHYTHM_LEVELS } from '../js/core/rushlogic.js';
 import { seededRng, addDays } from '../js/core/util.js';
 
 let passed = 0;
@@ -134,6 +134,35 @@ await test('passages fill their bars', () => {
     }
   }
   assert.ok(RHYTHM_LEVELS[1].patterns.length > 0);
+});
+
+await test('melody lines fill bars, stay in the pool and end at home', () => {
+  const pool = M.whiteRange('C4', 'C5');
+  for (let level = 1; level <= 4; level++) {
+    for (const bars of [1, 2, 3, 4, 8, 16]) {
+      for (let seed = 1; seed < 25; seed++) {
+        const p = generateMelody({ pool, bars, level, rng: seededRng(seed * 31 + bars) });
+        assert.equal(p.measures.length, bars);
+        assert.equal(p.beats, bars * 4);
+        assert.equal(p.chords.length, bars);
+        assert.equal(p.chords[bars - 1], 0);
+        for (const m of p.measures) assert.equal(m.events.reduce((s, e) => s + e.dur, 0), 4);
+        assert.ok(!p.measures[0].events[0].rest);
+        for (const n of p.notes) assert.ok(pool.some((x) => M.sameNote(x, n.note)), `${M.noteId(n.note)} not in pool`);
+        assert.equal(p.notes[p.notes.length - 1].note.letter, 'C');
+      }
+    }
+  }
+  // G major: F becomes F sharp, and the line ends on G
+  const g = generateMelody({ pool, bars: 4, level: 2, key: 1, rng: seededRng(7) });
+  assert.equal(g.key, 1);
+  for (const n of g.notes) if (n.note.letter === 'F') assert.equal(n.note.acc, 1);
+  assert.equal(g.notes[g.notes.length - 1].note.letter, 'G');
+  assert.equal(keyAcc('B', -1), -1);
+  assert.equal(keyAcc('E', -1), 0);
+  assert.equal(keyAcc('A', 5), 1);
+  // tiny pools fall back to the random walk
+  assert.ok(generateMelody({ pool: M.whiteRange('C4', 'D4'), bars: 1, rng: seededRng(1) }).notes.length > 0);
 });
 
 await test('scoring', () => {

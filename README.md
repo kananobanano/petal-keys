@@ -12,12 +12,16 @@ Read music, build chords and train your ears, one short lesson at a time.
 - **Note Rush**: look at a short line for as long as you like, tap Go, hear
   four clicks, then play along with the moving line. You get a score for the
   right notes and a separate score for timing (Perfect / Great / Good).
+  In Practice, pick any line length from 1 to 16 bars, and where lines come
+  from: **Melody** (tune-like lines built on common chord progressions, ending
+  on the home note), **Random**, or **My songs**.
 - **Find the note**: hear C, then a mystery note. Press keys freely to search,
   then submit the one that sounds right.
 - **Songs**: add a MusicXML file and learn it a few bars at a time.
   **Wait** mode waits on each note until you play it (with key hints);
   **Play along** gives a count-in and scores notes and timing. Choose a part
-  (about 4 bars), the hand (for two-staff piano music) and the tempo.
+  (about 4 bars, or **Choose bars…** for any From–To range), the hand (for
+  two-staff piano music) and the tempo.
   Note Rush can also take its lines from your songs ("Lines from: My songs").
 - **Instruments**: grand piano, electric piano, music box, marimba, organ,
   soft synth or dreamy pad (Me → Settings, or the picker in Free play).

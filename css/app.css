@@ -567,6 +567,22 @@ button.chip { cursor: pointer; }
 }
 .seg-btn[aria-checked='true'] { background: var(--ink); color: var(--paper); }
 .stepper { display: flex; align-items: center; gap: 14px; font: 700 16px var(--font-body); font-variant-numeric: tabular-nums; }
+.num-wrap { display: inline-flex; align-items: baseline; gap: 6px; }
+.num-in {
+  width: 3.2em;
+  padding: 7px 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.num-in::-webkit-inner-spin-button, .num-in::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.num-in:focus-visible { outline: 2px solid var(--lav); outline-offset: 1px; }
+.num-unit { min-width: 2.6em; color: var(--ink-2); }
 
 /* ---------- me ---------- */
 
@@ -1065,13 +1081,14 @@ body.in-exercise .toasts { top: calc(64px + env(safe-area-inset-top, 0px)); bott
 .song-tools { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; }
 .song-tools .select { max-width: 100%; font-weight: 700; font-size: 14px; }
 .seg-small .seg-btn { min-height: 36px; padding: 6px 13px; font-size: 13.5px; }
-.song-card { max-height: clamp(170px, 34vh, 520px); overflow-y: auto; overscroll-behavior: contain; }
+.song-card, .rush-card { max-height: clamp(170px, 34vh, 520px); overflow-y: auto; overscroll-behavior: contain; }
 .staff-svg .tie { fill: currentColor; color: var(--note-ink); }
 .staff-svg .tie.st-good { color: var(--mint-ink); }
 .staff-svg .bar-num { font: 700 10px var(--font-body); fill: var(--ink-3); }
 .staff-svg .st-active { color: var(--lav-ink); }
-@media (min-width: 700px) { .song-card { max-height: min(50vh, 560px); } }
+@media (min-width: 700px) { .song-card, .rush-card { max-height: min(50vh, 560px); } }
 .song-toggles { gap: 4px 14px; }
+.song-range label { font-weight: 700; font-size: 14px; color: var(--ink-2); }
 .song-toggles .switch-row { padding: 2px 0; }
 .chip-btn { cursor: pointer; }
 .learn-status { min-height: 1.5em; font-weight: 700; color: var(--lav-ink); }
