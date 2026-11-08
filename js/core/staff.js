@@ -672,7 +672,8 @@ export function renderStaff(target, score, opts = {}) {
       if (sysIdx !== si) continue;
       const k = staves.length > 1 ? (midiOf(gh.note) >= 60 ? 0 : 1) : 0;
       const p = staffPos(gh.note, staves[k]);
-      const gx = beatToXIn(si, gh.absBeat) - W.head / 2 + (gh.dx || 0);
+      // stay inside the staff when a slip lands at the end of a row
+      const gx = Math.min(beatToXIn(si, gh.absBeat) - W.head / 2 + (gh.dx || 0), right - W.head - 0.4);
       const gg = svg('g', { class: `ghost ${gh.cls || ''}` });
       for (let lp = 10; lp <= p; lp += 2) gg.append(line(gx - W.ledgerExt, Y(k, lp), gx + W.head + W.ledgerExt, Y(k, lp), W.ledger, 'ledger'));
       for (let lp = -2; lp >= p; lp -= 2) gg.append(line(gx - W.ledgerExt, Y(k, lp), gx + W.head + W.ledgerExt, Y(k, lp), W.ledger, 'ledger'));

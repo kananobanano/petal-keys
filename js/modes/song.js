@@ -279,6 +279,7 @@ export function createSong(ctx, cfg) {
       }
     }
     win = matchWindow(flat, msPerBeat);
+    ctx.app.debug = { song: { expected, startPerf, msPerBeat } }; // handy for testing
     draw({}, {});
     card.scrollTo({ top: 0 });
     ctx.feedback('Listen to the count-in…', 'info');
@@ -333,14 +334,28 @@ export function createSong(ctx, cfg) {
       else if (states[ev] !== 'miss') states[ev] = 'good';
       if (r.hit && !judgements[ev]) judgements[ev] = { label: r.label, cls: r.cls };
     });
-    draw(states, { judgements });
+    // keys you pressed that weren't in the music: faint pink notes where you hit them
+    const anyOctave = store.settings.anyOctave;
+    const ghosts = res.extra.map((pi) => {
+      const p = played[pi];
+      const absBeat = Math.max(0, Math.min(view.length, (p.t - startPerf - calib) / msPerBeat));
+      let midi = p.midi;
+      if (anyOctave && expected.length) {
+        // small keyboards play in any octave: draw the slip next to the note you meant
+        const near = expected.reduce((a, b) => (Math.abs(b.t - p.t) < Math.abs(a.t - p.t) ? b : a));
+        while (midi - near.midi > 6) midi -= 12;
+        while (near.midi - midi > 6) midi += 12;
+      }
+      return { absBeat, note: spell(midi, song.key < 0 ? 'flat' : 'sharp'), cls: 'extra', dx: 1.3 };
+    });
+    draw(states, { judgements, ghosts });
     card.scrollTo({ top: 0, behavior: 'smooth' });
-    finishRun(res.combined, res);
+    finishRun(res.combined, res, ghosts.length ? ' The faint pink notes show extra keys you pressed.' : '');
   }
 
   // ----- results -----
 
-  function finishRun(score, res = null) {
+  function finishRun(score, res = null, extraNote = '') {
     phase = pref.mode === 'wait' ? 'done' : 'result';
     kb.clearMarks('hint');
     runs++;
@@ -382,7 +397,7 @@ export function createSong(ctx, cfg) {
         chip(isBest ? 'New best' : 'Score', `${score}%`, 'total' + (isBest ? ' best' : ''))));
     }
     const msg = score >= 90 ? 'Beautiful! Ready to try it faster, or the next part?' : score >= 70 ? 'Lovely! One more time makes it stick.' : 'Nice effort. Go again slowly, it gets easier each time.';
-    ctx.feedback(msg, score >= 70 ? 'good' : 'hint');
+    ctx.feedback(msg + extraNote, score >= 70 ? 'good' : 'hint');
     const nextSec = !isCustom() && pref.sec > 0 && pref.sec < secs.length - 1;
     const acts = [button('Again', { kind: 'ghost', ico: 'replay', onclick: () => restart() })];
     if (nextSec) acts.push(button('Next part', { kind: 'ghost', onclick: () => { pref.sec++; secSel.value = String(pref.sec); savePref(); reset(); } }));

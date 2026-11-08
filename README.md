@@ -25,7 +25,8 @@ Read music, build chords and train your ears, one short lesson at a time.
   then submit the one that sounds right.
 - **Songs**: add a MusicXML file and learn it a few bars at a time.
   **Wait** mode waits on each note until you play it (with key hints);
-  **Play along** gives a count-in and scores notes and timing. Choose a part
+  **Play along** gives a count-in and scores notes and timing; afterwards,
+  faint pink notes show any extra keys you pressed. Choose a part
   (about 4 bars, or **Choose bars…** for any From–To range), the hand (for
   two-staff piano music) and the tempo. Songs with sharps or flats in the key
   signature get a **Key reminder**: a small lavender ♯ or ♭ beside every note
