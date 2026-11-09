@@ -7,9 +7,9 @@ import { spell, noteLabel, midiLabel } from '../core/music.js';
 import { sheet, toast } from '../ui/overlay.js';
 import { icon } from '../ui/icons.js';
 import { renderStaff } from '../core/staff.js';
-import { getSong, buildView, sections, matches } from '../core/songs.js';
+import { getSong, buildView, sections, matches, storedProgress } from '../core/songs.js';
 import { scoreAttempt, matchWindow, assignWindows } from '../core/rushlogic.js';
-import { button } from './common.js';
+import { button, tempoControl, countInBeats, TEMPO_MAX } from './common.js';
 
 export function createSong(ctx, cfg) {
   const { store, kb, audio } = ctx;
@@ -115,24 +115,24 @@ export function createSong(ctx, cfg) {
     restartKeyBtn.querySelector('.chip-text').textContent = t ? `Restart: ${triggerName(t)}` : 'Set restart button';
   };
   paintRestartKey();
+  // the speed written in the file: one tap to try it at full speed
+  const fileTempo = song.tempo ? Math.max(30, Math.min(TEMPO_MAX, song.tempo)) : null;
+  const songTempoBtn = fileTempo
+    ? h('button', { class: 'chip chip-btn', type: 'button', 'aria-label': `Use the song's tempo, ${fileTempo}`, onclick: () => {
+      tempoBox.set(fileTempo);
+      toast(`Tempo set to ♩ = ${fileTempo}, the song's own speed.`, { kind: 'good' });
+    } }, icon('metronome'), h('span', { class: 'chip-text' }, `Song tempo ${fileTempo}`))
+    : null;
   const toolbar = h('div', { class: 'song-tools' }, secSel, handSel, modeSeg);
   const toggles = h('div', { class: 'song-tools song-toggles' },
     toggle('song-hints', 'Key hints', 'hints', () => { paintHints(); waitFeedback(); }),
     toggle('song-names', 'Note names', 'names', () => draw()),
     song.key ? toggle('song-keyhints', 'Key reminder', 'keyHints', () => draw()) : null,
-    restartKeyBtn);
-  const tempoVal = h('span', { class: 'tempo-val' });
-  const tempoCtl = h('div', { class: 'tempo', role: 'group', 'aria-label': 'Tempo' },
-    h('button', { class: 'btn btn-round', type: 'button', 'aria-label': 'Slower', onclick: () => setTempo(pref.tempo - 5) }, '−'),
-    h('span', { class: 'tempo-lbl' }, h('span', { class: 'q' }, '♩'), ' = ', tempoVal),
-    h('button', { class: 'btn btn-round', type: 'button', 'aria-label': 'Faster', onclick: () => setTempo(pref.tempo + 5) }, '+'));
-
-  function setTempo(v) {
-    pref.tempo = Math.max(30, Math.min(200, v));
-    tempoVal.textContent = String(pref.tempo);
-    savePref();
-  }
-  setTempo(pref.tempo);
+    restartKeyBtn,
+    songTempoBtn);
+  const tempoBox = tempoControl({ value: pref.tempo, min: 30, max: TEMPO_MAX, onChange: (v) => { pref.tempo = v; savePref(); } });
+  pref.tempo = tempoBox.value;
+  const tempoCtl = tempoBox.el;
 
   const staffIdx = () => (!two ? [0] : pref.hand === 'left' ? [1] : pref.hand === 'both' ? [0, 1] : [0]);
 
@@ -264,9 +264,10 @@ export function createSong(ctx, cfg) {
     calib = store.getLocal('calibrationMs') || 0;
     msPerBeat = 60000 / pref.tempo;
     const beatSec = 60 / pref.tempo;
-    const countBeats = Math.max(2, Math.min(4, song.time[0] * (4 / song.time[1])));
+    const barBeats = Math.max(2, Math.min(4, song.time[0] * (4 / song.time[1])));
+    const countBeats = countInBeats(barBeats, beatSec);
     const t0 = audio.now + 0.35;
-    for (let i = 0; i < countBeats; i++) audio.click(t0 + i * beatSec, i === 0);
+    for (let i = 0; i < countBeats; i++) audio.click(t0 + i * beatSec, i % barBeats === 0);
     const tStart = t0 + countBeats * beatSec;
     if (store.settings.metronome) for (let i = 0; i < Math.ceil(view.length); i++) audio.click(tStart + i * beatSec, false);
     startPerf = audio.perfTimeOf(tStart);
@@ -371,6 +372,8 @@ export function createSong(ctx, cfg) {
       draw(Object.fromEntries(view.steps.map((s) => [s.ev, 'good'])), {});
       layout.setPlayhead(null);
     }
+    const play = pref.mode === 'play';
+    const before = play ? storedProgress(store, entry.id, song).learned : 0;
     let isBest;
     if (isCustom()) {
       // Chosen ranges keep their best on this device only, so backups stay tiny.
@@ -381,6 +384,8 @@ export function createSong(ctx, cfg) {
         pref.cbest[ck] = score;
         savePref();
       }
+      // chose every bar: that's a whole-song run too
+      if (play && pref.from === 0 && pref.to === lastBar) store.setBest(`song:${entry.id}:0:${pref.hand}:play`, score);
     } else {
       isBest = store.setBest(`song:${entry.id}:${pref.sec}:${pref.hand}:${pref.mode}`, score) && score > 0;
     }
@@ -403,6 +408,12 @@ export function createSong(ctx, cfg) {
       summary.append(h('div', { class: 'score-chips' },
         chip('First try', `${firstTry}/${view.steps.length}`, 'notes'),
         chip(isBest ? 'New best' : 'Score', `${score}%`, 'total' + (isBest ? ' best' : ''))));
+    }
+    if (play) {
+      const { learned, full } = storedProgress(store, entry.id, song);
+      store.setBest(`song:${entry.id}:learned`, learned);
+      const up = learned > before ? ` (up from ${before}%)` : '';
+      summary.append(h('p', { class: 'judge-summary' }, `Whole song: ${learned}% learned${up}${full != null ? ` · full run best ${full}` : ''}`));
     }
     const msg = score >= 90 ? 'Beautiful! Ready to try it faster, or the next part?' : score >= 70 ? 'Lovely! One more time makes it stick.' : 'Nice effort. Go again slowly, it gets easier each time.';
     ctx.feedback(msg + extraNote, score >= 70 ? 'good' : 'hint');

@@ -8,6 +8,7 @@ import { generatePassage, generateMelody, keyAcc, scoreAttempt, matchWindow, ass
 import { seededRng, addDays } from '../js/core/util.js';
 import * as K from '../js/core/keys.js';
 import { LESSONS, UNITS } from '../js/lessons.js';
+import { songProgress, sections } from '../js/core/songs.js';
 
 // keep in step with js/modes/index.js (which needs a browser to import)
 const DRILL_MODES = ['name', 'flash', 'rush', 'chord', 'hl', 'find', 'scale', 'keyname'];
@@ -267,6 +268,33 @@ await test('per-note timing windows are fair', () => {
   // any-octave: C and the C an octave up are "the same key" for spacing
   const oct = assignWindows([{ midi: 60, t: 0 }, { midi: 72, t: 200 }], { anyOctave: true });
   assert.equal(oct[0].win, WINDOW_MIN);
+});
+
+await test('song progress: bar by bar, best hand, full runs', () => {
+  // 8 bars of 4/4; right hand plays every bar, left hand only bars 1-4
+  const measures = Array.from({ length: 8 }, (_, i) => ({ label: i + 1, start: i * 4, beats: 4 }));
+  const notes = [];
+  for (let i = 0; i < 8; i++) notes.push({ si: 0, beat: i * 4, dur: 4, midi: 60 });
+  for (let i = 0; i < 4; i++) notes.push({ si: 1, beat: i * 4, dur: 4, midi: 48 });
+  const song = { staves: ['treble', 'bass'], time: [4, 4], measures, notes };
+  assert.deepEqual(sections(song).map((s) => [s.from, s.to]), [[0, 7], [0, 3], [4, 7]]);
+  // nothing played yet
+  assert.deepEqual(songProgress(song), { learned: 0, full: null });
+  // one perfect bar out of eight is not "100"
+  assert.equal(songProgress(song, { custom: { '0-0:right:play': 100 } }).learned, 13);
+  // wait-mode runs don't count
+  assert.equal(songProgress(song, { custom: { '0-7:right:wait': 100 } }).learned, 0);
+  // a part at 80 plus one bar at 100 inside it: each bar keeps its best
+  const parts = { '1:right': 80 };
+  const p = songProgress(song, { partBest: (i, hd) => parts[`${i}:${hd}`], custom: { '1-1:right:play': 100 } });
+  assert.equal(p.learned, Math.round((80 * 3 + 100) / 8));
+  assert.equal(p.full, null);
+  // left hand has notes only in bars 1-4, so bars 1-4 at 90 = 90% of the left hand
+  assert.equal(songProgress(song, { partBest: (i, hd) => (i === 1 && hd === 'left' ? 90 : undefined) }).learned, 90);
+  // a whole-song run counts for every bar and as the full run
+  const w = songProgress(song, { partBest: (i, hd) => (i === 0 && hd === 'both' ? 72 : undefined), custom: { '0-7:right:play': 64 } });
+  assert.equal(w.learned, 72);
+  assert.equal(w.full, 72);
 });
 
 console.log(`core tests: ${passed} passed`);

@@ -29,7 +29,7 @@ Read music, build chords and train your ears, one short lesson at a time.
   **Play along** gives a count-in and scores notes and timing; afterwards,
   faint pink notes show any extra keys you pressed. Choose a part
   (about 4 bars, or **Choose bars…** for any From–To range), the hand (for
-  two-staff piano music) and the tempo. Songs with sharps or flats in the key
+  two-staff piano music) and the tempo (each song remembers its own). Songs with sharps or flats in the key
   signature get a **Key reminder**: a small lavender ♯ or ♭ beside every note
   the key signature changes.
   Note Rush can also take its lines from your songs ("Lines from: My songs").
@@ -73,6 +73,10 @@ The first time, Firefox asks you to add a small "site permission" add-on;
 that is expected. For a taskbar icon, use Firefox's **Add to taskbar** (on
 Windows) or Chrome's **Install** button in the address bar.
 
+Firefox doesn't notice a keyboard plugged in after the page has opened, so
+Petal Keys quietly looks again every few seconds until it finds one. If it
+still can't see it, tap **Keys → Look again** (no need to open a DAW first).
+
 No keyboard nearby? The computer keys `A W S E D F T G Y H U J K` play notes,
 and `Z` / `X` change the octave.
 
@@ -103,6 +107,14 @@ While learning a song:
 - **Quick restart** starts the part again from the top, even from the
   results screen: tap **Restart**, press **R** on a computer, or set a pad or
   button on your MIDI keyboard with **Set restart button** (Note Rush uses it too).
+- **Tempo** goes from 30 up to 400. Hold − or + to move quickly. At fast
+  tempos the count-in is two bars, so you have time to get ready. Songs start
+  slower than written; tap **Song tempo** to jump to the speed in the file.
+- **Song score**: on the Songs list, "% learned" grows bar by bar. Each bar
+  keeps the best Play along run that included it (a part, chosen bars or the
+  whole song), and the song's score is the average over all its bars, so
+  one perfect bar of a long song is only a small step. "Full run" is your
+  best Play along run of the whole song. Wait mode doesn't count here.
 
 Songs are stored on the device you added them on. They are not part of the
 backup file (to keep it tiny), so add the file on each device; your best

@@ -222,6 +222,16 @@ notes), no grace notes, max two staves, no lyrics/dynamics/slurs.
 - Song Mode "Choose bars…" (`pref.sec === 'custom'`, `pref.from/to` are
   measure indices). Bests for chosen ranges live in the device-only song pref
   (`pref.cbest`), not in the backup, so backups stay tiny.
+- Each song's tempo, part, hand and toggles are in the device-only pref
+  `song:<id>` (not in the backup). The file's own tempo is `song.tempo`
+  (read up to 600; only the first tempo mark counts); Song Mode starts at
+  60% of it, capped at 120. The "Song tempo N" chip sets it to the file's tempo.
+- **Song score** (`songProgress` / `storedProgress` in `songs.js`, Play along
+  only): each bar takes the best run covering it (ready-made parts from `b`,
+  chosen bars from `pref.cbest`), averaged over bars with notes for that hand;
+  best hand wins. `full` = best whole-song run. The result is also saved as
+  `b['song:<id>:learned']` (max wins) so it travels in backups. Minty chose
+  this over "max of any part" (one perfect bar used to show "best 100").
 
 ### Keys & key signatures (unit I, lessons L29–L38)
 
@@ -253,6 +263,9 @@ notes), no grace notes, max two staves, no lyrics/dynamics/slurs.
   between, bar 3 of each phrase echoes bar 1, ends V–I or IV–I on the home
   note), `new` (random walk, `generatePassage`), `songs`. Lessons and Mix
   still use the random walk.
+- Tempo: 40–400 (Note Rush), 30–400 (Song Mode), `TEMPO_MAX` in
+  `modes/common.js`. `tempoControl` / `holdRepeat` make − / + repeat when
+  held; `countInBeats` doubles the count-in when it would last under ~1.2 s.
 - Timing (Note Rush and Song Mode play along): labels Perfect ≤50 ms, Great
   ≤100, Good ≤170, else Early/Late. Each expected note has its own window
   (`assignWindows`: up to 450 ms, only shrinking to half the gap to the same

@@ -267,6 +267,16 @@ midi.onChange(() => {
   paintStatus();
 });
 
+// Firefox doesn't notice a keyboard plugged in after the page asked for MIDI
+// (a reload did). So while none is found, quietly look again: every few
+// seconds in Firefox, and whenever the page comes back into view.
+const lookForKeyboard = () => {
+  if (midi.status === 'no-device' && document.visibilityState === 'visible') midi.rescan();
+};
+if (/Firefox\//.test(navigator.userAgent)) setInterval(lookForKeyboard, 3000);
+document.addEventListener('visibilitychange', lookForKeyboard);
+window.addEventListener('focus', lookForKeyboard);
+
 function midiSheet() {
   const st = midi.status;
   const text = {
@@ -287,9 +297,11 @@ function midiSheet() {
     h('p', { class: 'muted small' }, 'No keyboard nearby? On a computer, the letters A W S E D F T G Y H U J K play notes too (Z and X change octave).'),
     h('div', { class: 'row-actions' },
       h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => close() }, 'Close'),
-      st !== 'connected' && st !== 'unsupported'
-        ? h('button', { class: 'btn btn-primary', type: 'button', 'data-autofocus': '', onclick: () => { close(); app.connectMidi(true); } }, icon('plug'), h('span', {}, 'Connect'))
-        : null)), { title: 'Your keyboard' });
+      st === 'connected'
+        ? h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { close(); app.connectMidi(true); } }, icon('plug'), h('span', {}, 'Look again'))
+        : st !== 'unsupported'
+          ? h('button', { class: 'btn btn-primary', type: 'button', 'data-autofocus': '', onclick: () => { close(); app.connectMidi(true); } }, icon('plug'), h('span', {}, st === 'no-device' ? 'Look again' : 'Connect'))
+          : null)), { title: 'Your keyboard' });
 }
 
 // ---------- input wiring ----------

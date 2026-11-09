@@ -6,7 +6,7 @@ import { h } from '../core/util.js';
 import { parseNote, spell, noteLabel, midiOf } from '../core/music.js';
 import { renderStaff, staffPos } from '../core/staff.js';
 import { generatePassage, generateMelody, scoreAttempt, matchWindow, judgeTiming, assignWindows } from '../core/rushlogic.js';
-import { button, clefKey, rangeOf, poolExtent, matchesNote } from './common.js';
+import { button, clefKey, rangeOf, poolExtent, matchesNote, tempoControl, countInBeats, TEMPO_MAX } from './common.js';
 import { songPassage } from '../core/songs.js';
 import { toast } from '../ui/overlay.js';
 import { keyName, signatureNotes, listText } from '../core/keys.js';
@@ -48,19 +48,11 @@ export function createRush(ctx, cfg) {
   const staffCard = h('div', { class: 'staff-card rush-card' }, staffEl, popLayer);
   const dots = [0, 1, 2, 3].map(() => h('i'));
   const beatDots = h('div', { class: 'beat-dots', 'aria-hidden': 'true' }, dots);
-  const tempoVal = h('span', { class: 'tempo-val' });
-  const slower = h('button', { class: 'btn btn-round', type: 'button', 'aria-label': 'Slower', onclick: () => setTempo(tempo - 5) }, '−');
-  const faster = h('button', { class: 'btn btn-round', type: 'button', 'aria-label': 'Faster', onclick: () => setTempo(tempo + 5) }, '+');
-  const tempoCtl = h('div', { class: 'tempo', role: 'group', 'aria-label': 'Tempo' }, slower, h('span', { class: 'tempo-lbl' }, h('span', { class: 'q' }, '♩'), ' = ', tempoVal), faster);
+  const tempoBox = tempoControl({ value: tempo, min: 40, max: TEMPO_MAX, onChange: (v) => { tempo = v; } });
+  tempo = tempoBox.value;
+  const tempoCtl = tempoBox.el;
   const scoreBox = h('div', { class: 'score-box', 'aria-live': 'polite' });
-
-  function setTempo(v) {
-    tempo = Math.max(40, Math.min(132, v));
-    tempoVal.textContent = String(tempo);
-    slower.disabled = tempo <= 40;
-    faster.disabled = tempo >= 132;
-  }
-  setTempo(tempo);
+  let countIn = 4;
 
   function draw(extra = {}) {
     lastDraw = extra;
@@ -125,9 +117,10 @@ export function createRush(ctx, cfg) {
     calib = store.getLocal('calibrationMs') || 0;
     msPerBeat = 60000 / tempo;
     const beatSec = 60 / tempo;
+    countIn = countInBeats(4, beatSec);
     const t0 = audio.now + 0.35;
-    for (let i = 0; i < 4; i++) audio.click(t0 + i * beatSec, i === 0);
-    const tStart = t0 + 4 * beatSec;
+    for (let i = 0; i < countIn; i++) audio.click(t0 + i * beatSec, i % 4 === 0);
+    const tStart = t0 + countIn * beatSec;
     if (store.settings.metronome) {
       for (let i = 0; i < passage.beats; i++) audio.click(tStart + i * beatSec, false);
     }
@@ -143,7 +136,7 @@ export function createRush(ctx, cfg) {
     followedRow = -1;
     followRow(0);
     beatDots.classList.add('on');
-    ctx.feedback('Listen to the four clicks…', 'info');
+    ctx.feedback(countIn === 4 ? 'Listen to the four clicks…' : 'Listen to the count-in…', 'info');
     ctx.setActions(button('Stop', { kind: 'ghost', onclick: () => stop() }));
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(tick);
@@ -160,7 +153,7 @@ export function createRush(ctx, cfg) {
     if (!ctx.isOpen() || (phase !== 'countin' && phase !== 'play')) return;
     const beat = (performance.now() - startPerf) / msPerBeat;
     if (beat < 0) {
-      const n = Math.floor(beat + 4);
+      const n = Math.floor(((beat + countIn) * 4) / countIn);
       dots.forEach((d, i) => d.classList.toggle('lit', i <= n));
       layout.setPlayhead(null);
     } else {

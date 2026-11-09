@@ -180,7 +180,7 @@ export function parseMusicXml(text, fileName = '') {
     title: title.slice(0, 80),
     key: key || 0,
     time: time || [4, 4],
-    tempo: tempo && tempo > 20 && tempo < 300 ? Math.round(tempo) : null,
+    tempo: tempo && tempo > 20 && tempo <= 600 ? Math.round(tempo) : null,
     staves,
     measures,
     notes,

@@ -92,23 +92,52 @@ export class MidiInput {
 
   async connect() {
     if (this.status === 'unsupported') return this.status;
-    if (this.access) {
-      this._refresh();
-      return this.status;
-    }
+    if (this.access) return this.rescan();
     this.status = 'asking';
     this._emit();
+    let access;
     try {
-      this.access = await navigator.requestMIDIAccess({ sysex: false });
+      access = await navigator.requestMIDIAccess({ sysex: false });
     } catch (err) {
       this.status = 'denied';
       this.error = err;
       this._emit();
       return this.status;
     }
-    this.access.onstatechange = () => this._refresh();
-    this._refresh();
+    this._use(access);
     return this.status;
+  }
+
+  /**
+   * Ask the browser for a fresh device list. Firefox never updates a
+   * MIDIAccess when a keyboard is plugged in later (no statechange), so a new
+   * requestMIDIAccess is the only way to see it. No prompt once allowed.
+   */
+  async rescan() {
+    if (!this.access || this._scanning) return this.status;
+    this._scanning = true;
+    try {
+      const access = await navigator.requestMIDIAccess({ sysex: false });
+      const old = this.access;
+      if (access !== old) {
+        // swap in one go, so no key press is heard twice or lost
+        old.onstatechange = null;
+        old.inputs.forEach((input) => { input.onmidimessage = null; });
+        this.bus.releaseSource('midi');
+      }
+      this._use(access);
+    } catch {
+      this._refresh();
+    } finally {
+      this._scanning = false;
+    }
+    return this.status;
+  }
+
+  _use(access) {
+    this.access = access;
+    access.onstatechange = () => this._refresh();
+    this._refresh();
   }
 
   _refresh() {

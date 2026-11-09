@@ -4,7 +4,8 @@
 import { h } from '../core/util.js';
 import { icon } from './icons.js';
 import { sheet, toast, confirmSheet } from './overlay.js';
-import { listSongs, addSong, removeSong, sections } from '../core/songs.js';
+import { listSongs, addSong, removeSong, storedProgress } from '../core/songs.js';
+import { holdRepeat, TEMPO_MAX } from '../modes/common.js';
 import { readSongFile } from '../core/musicxml.js';
 import { noteLabel, midiOf, chordSymbol } from '../core/music.js';
 import { RHYTHM_LEVELS } from '../core/rushlogic.js';
@@ -140,7 +141,7 @@ export function renderPractice(app, root) {
       options: (body) => {
         const tempoOut = h('output', { class: 'stepper-val', id: 'rush-tempo-out' }, String(store.settings.rushTempo || 60));
         const setT = (d) => {
-          const v = Math.max(40, Math.min(132, (store.settings.rushTempo || 60) + d));
+          const v = Math.max(40, Math.min(TEMPO_MAX, (store.settings.rushTempo || 60) + d));
           store.set('rushTempo', v);
           tempoOut.textContent = String(v);
         };
@@ -159,9 +160,9 @@ export function renderPractice(app, root) {
             : null,
           h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Tempo'),
             h('div', { class: 'stepper' },
-              h('button', { class: 'btn btn-round', type: 'button', 'aria-label': 'Slower', onclick: () => setT(-5) }, '−'),
+              holdRepeat(h('button', { class: 'btn btn-round', type: 'button', 'aria-label': 'Slower' }, '−'), (fast) => setT(fast ? -10 : -5)),
               h('span', {}, '♩ = ', tempoOut),
-              h('button', { class: 'btn btn-round', type: 'button', 'aria-label': 'Faster', onclick: () => setT(5) }, '+'))),
+              holdRepeat(h('button', { class: 'btn btn-round', type: 'button', 'aria-label': 'Faster' }, '+'), (fast) => setT(fast ? 10 : 5)))),
         );
       },
       go: () => {
@@ -311,15 +312,15 @@ function songsSection(app) {
   for (const { id, song } of songs) {
     const bars = song.measures.length;
     const hands = song.staves.length > 1 ? 'both hands' : song.staves[0] === 'bass' ? 'bass clef' : 'one staff';
-    const bests = sections(song).map((_, i) => ['wait', 'play'].map((m) => ['right', 'left', 'both'].map((hd) => store.best(`song:${id}:${i}:${hd}:${m}`)))).flat(3).filter((v) => v != null);
-    const best = bests.length ? Math.max(...bests) : null;
+    const { learned, full } = storedProgress(store, id, song);
+    const scoreTxt = (learned ? ` · ${learned}% learned` : '') + (full != null ? ` · full run ${full}` : '');
     const startIt = () => app.startSession({ title: song.title, kind: 'practice', steps: [{ type: 'song', songId: id, count: 1 }] });
     list.append(h('li', { class: 'song-row' },
       h('button', { class: 'song-main', type: 'button', dataset: { song: id }, onclick: startIt },
         h('span', { class: 'song-ico' }, icon('rush')),
         h('span', { class: 'song-text' },
           h('span', { class: 'song-title' }, song.title),
-          h('span', { class: 'song-sub' }, `${bars} bar${bars === 1 ? '' : 's'} · key of ${KEY_NAMES[song.key] || 'C'} · ${hands}${best != null ? ` · best ${best}` : ''}`))),
+          h('span', { class: 'song-sub' }, `${bars} bar${bars === 1 ? '' : 's'} · key of ${KEY_NAMES[song.key] || 'C'} · ${hands}${scoreTxt}`))),
       h('button', { class: 'icon-btn song-more', type: 'button', 'aria-label': `Remove ${song.title}`, onclick: async () => {
         const ok = await confirmSheet({ title: `Remove “${song.title}”?`, body: 'It is removed from this device. You can add the file again any time.', ok: 'Remove', danger: true });
         if (ok) {

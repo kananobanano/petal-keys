@@ -317,7 +317,7 @@ export function renderMe(app, root) {
       h('div', { class: 'set-row' },
         h('span', { class: 'set-text' }, h('span', { class: 'set-label' }, 'Keyboard (MIDI)'), h('span', { class: 'set-hint' }, midiStatus)),
         midi.status !== 'unsupported' && midi.status !== 'connected'
-          ? h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => app.connectMidi(true) }, icon('plug'), h('span', {}, 'Connect'))
+          ? h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => app.connectMidi(true) }, icon('plug'), h('span', {}, midi.status === 'no-device' ? 'Look again' : 'Connect'))
           : null),
       toggle('set-kbhide', 'Hide on-screen keys', !!store.getLocal('kbHidden'), (v) => store.setLocal('kbHidden', v), 'Only while a keyboard is connected'),
       toggle('set-drums', 'Ignore drum pads', st.ignoreDrumChannel, (v) => store.set('ignoreDrumChannel', v), 'Pads on MIDI channel 10 will not count as notes'),

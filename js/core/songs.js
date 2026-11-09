@@ -180,6 +180,59 @@ export function buildView(song, { staffIdx = [0], from = 0, to = song.measures.l
   };
 }
 
+export const HANDS = ['right', 'left', 'both'];
+
+/** Which song staves a hand plays (one-staff songs: always the only staff). */
+export const handStaves = (song, hand) => (song.staves.length < 2 ? [0] : hand === 'left' ? [1] : hand === 'both' ? [0, 1] : [0]);
+
+/** Measure indices that have something to play for these staves. */
+export function barsWithNotes(song, staffIdx) {
+  const set = new Set(staffIdx);
+  return song.measures.map((m) => song.notes.some((n) => set.has(n.si) && !n.tieStop && n.beat >= m.start - EPS && n.beat < m.start + m.beats - EPS));
+}
+
+/**
+ * How much of a song is learned, from Play along runs.
+ *   partBest(i, hand): best score for ready-made part i of sections(song) (0 = whole song)
+ *   custom: { 'from-to:hand:mode': score } bests for chosen bars (this device)
+ * Every bar keeps the best run that covered it; a hand's progress is the
+ * average over the bars that have notes for that hand (unplayed bars count 0).
+ * Returns { learned: 0..100 for the best hand, full: best whole-song run or null }.
+ */
+export function songProgress(song, { partBest = () => undefined, custom = {} } = {}) {
+  const secs = sections(song);
+  const last = song.measures.length - 1;
+  let learned = 0;
+  let full = null;
+  for (const hand of HANDS) {
+    const bars = new Array(song.measures.length).fill(0);
+    const cover = (from, to, score) => {
+      if (!(score > 0)) return;
+      for (let i = Math.max(0, from); i <= Math.min(last, to); i++) bars[i] = Math.max(bars[i], score);
+      if (from <= 0 && to >= last) full = Math.max(full ?? 0, score);
+    };
+    secs.forEach((sc, i) => cover(sc.from, sc.to, partBest(i, hand)));
+    for (const [k, score] of Object.entries(custom || {})) {
+      const m = /^(\d+)-(\d+):(\w+):play$/.exec(k);
+      if (m && m[3] === hand) cover(Number(m[1]), Number(m[2]), score);
+    }
+    const has = barsWithNotes(song, handStaves(song, hand));
+    const playable = bars.filter((_, i) => has[i]);
+    if (playable.length) learned = Math.max(learned, Math.round(playable.reduce((a, b) => a + b, 0) / playable.length));
+  }
+  return { learned, full };
+}
+
+/**
+ * songProgress from what the store remembers. `learned` also travels in the
+ * backup as one number per song (song:<id>:learned), so other devices see it.
+ */
+export function storedProgress(store, id, song) {
+  const pref = store.getLocal(`song:${id}`) || {};
+  const p = songProgress(song, { partBest: (i, hand) => store.best(`song:${id}:${i}:${hand}:play`), custom: pref.cbest });
+  return { learned: Math.max(p.learned, store.best(`song:${id}:learned`) || 0), full: p.full };
+}
+
 /** Does a played key satisfy a wanted note? */
 export const matches = (played, wanted, anyOctave) => played === wanted || (anyOctave && pc(played) === pc(wanted));
 
