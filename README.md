@@ -34,7 +34,9 @@ Read music, build chords and train your ears, one short lesson at a time.
   the key signature changes.
   Note Rush can also take its lines from your songs ("Lines from: My songs").
 - **Instruments**: grand piano, electric piano, music box, marimba, organ,
-  soft synth or dreamy pad (Me → Settings, or the picker in Free play).
+  soft synth, dreamy pad, and some harder synths for punchier songs: buzzy
+  synth, supersaw, square lead, synth brass and a plain square wave
+  (Me → Settings, or the picker in Free play).
 - **Progress** saves by itself, with a streak that forgives one rest day a week.
   A tiny backup file (a few hundred characters) moves it between devices.
 

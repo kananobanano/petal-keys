@@ -27,7 +27,26 @@ export const INSTRUMENTS = [
   { id: 'organ', label: 'Organ' },
   { id: 'synth', label: 'Soft synth' },
   { id: 'pad', label: 'Dreamy pad' },
+  { id: 'buzz', label: 'Buzzy synth' },
+  { id: 'supersaw', label: 'Supersaw' },
+  { id: 'squarelead', label: 'Square lead' },
+  { id: 'brass', label: 'Synth brass' },
+  { id: 'square', label: 'Square wave' },
 ];
+
+// Soft-clip curve for the buzzy synth: drives the waves into a gritty edge.
+let buzzCurve = null;
+function getBuzzCurve() {
+  if (!buzzCurve) {
+    const n = 1024;
+    buzzCurve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      buzzCurve[i] = Math.tanh(x * 3.2) / Math.tanh(3.2);
+    }
+  }
+  return buzzCurve;
+}
 const MAX_VOICES = 40;
 
 export class AudioEngine {
@@ -278,6 +297,101 @@ export class AudioEngine {
         osc('triangle', f / 2, 0.5, filt);
         hold(amp * 0.24, amp * 0.2, 0.28);
         return { stops, tc: 0.55 };
+      }
+      case 'buzz': {
+        // Hard, buzzy lead: detuned saws + a square sub, driven into a soft
+        // clipper, then a resonant filter that snaps shut a little ("tzzrr").
+        const drive = ctx.createWaveShaper();
+        drive.curve = getBuzzCurve();
+        drive.oversample = '2x';
+        const filt = ctx.createBiquadFilter();
+        filt.type = 'lowpass';
+        filt.Q.value = 5;
+        const bright = 0.6 + 0.4 * amp; // harder presses are brighter
+        filt.frequency.setValueAtTime(Math.min(18000, f * 24 * bright), t);
+        filt.frequency.exponentialRampToValueAtTime(Math.min(14000, Math.max(1400, f * 7 * bright)), t + 0.18);
+        drive.connect(filt);
+        filt.connect(env);
+        const a = osc('sawtooth', f, 0.45, drive, -12);
+        const b = osc('sawtooth', f, 0.45, drive, 12);
+        osc('square', f / 2, 0.3, drive);
+        // a tiny pitch "zip" into the note
+        for (const o of [a.o, b.o]) {
+          o.frequency.setValueAtTime(f * 1.03, t);
+          o.frequency.exponentialRampToValueAtTime(f, t + 0.04);
+        }
+        hold(amp * 0.17, amp * 0.13, 0.004);
+        return { stops, tc: 0.07 };
+      }
+      case 'supersaw': {
+        // The classic trance / J-pop lead: seven saws spread out in tune,
+        // plus one an octave down for body.
+        const filt = ctx.createBiquadFilter();
+        filt.type = 'lowpass';
+        filt.Q.value = 0.8;
+        filt.frequency.setValueAtTime(Math.min(18000, f * 30), t);
+        filt.frequency.exponentialRampToValueAtTime(Math.min(15000, Math.max(2500, f * 12)), t + 0.3);
+        filt.connect(env);
+        // (spread saws partly cancel, so each one is louder than it looks)
+        for (const cents of [-34, -21, -10, 0, 10, 21, 34]) osc('sawtooth', f, 0.36, filt, cents);
+        osc('sawtooth', f / 2, 0.3, filt, 4);
+        hold(amp * 0.2, amp * 0.17, 0.006);
+        return { stops, tc: 0.12 };
+      }
+      case 'squarelead': {
+        // Retro square lead with a gentle vibrato that fades in while held.
+        const filt = ctx.createBiquadFilter();
+        filt.type = 'lowpass';
+        filt.Q.value = 0.7;
+        filt.frequency.value = Math.min(14000, f * 10);
+        filt.connect(env);
+        const a = osc('square', f, 0.5, filt, -4);
+        const b = osc('square', f, 0.5, filt, 4);
+        osc('square', f * 2, 0.08, filt);
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = 5.6;
+        const depth = ctx.createGain();
+        depth.gain.setValueAtTime(0, t);
+        depth.gain.setValueAtTime(0, t + 0.28);
+        depth.gain.linearRampToValueAtTime(14, t + 0.7); // cents
+        lfo.connect(depth);
+        depth.connect(a.o.detune);
+        depth.connect(b.o.detune);
+        lfo.start(t);
+        stops.push(lfo);
+        hold(amp * 0.16, amp * 0.14, 0.004);
+        return { stops, tc: 0.06 };
+      }
+      case 'brass': {
+        // 80s synth brass: the filter swells open ("bwaah") then settles.
+        const filt = ctx.createBiquadFilter();
+        filt.type = 'lowpass';
+        filt.Q.value = 1.6;
+        filt.frequency.setValueAtTime(Math.max(200, f * 1.2), t);
+        filt.frequency.exponentialRampToValueAtTime(Math.min(16000, f * (5 + 4 * amp)), t + 0.09);
+        filt.frequency.exponentialRampToValueAtTime(Math.min(12000, f * 3.2), t + 0.6);
+        filt.connect(env);
+        osc('sawtooth', f, 0.45, filt, -8);
+        osc('sawtooth', f, 0.45, filt, 8);
+        osc('sawtooth', f / 2, 0.2, filt);
+        env.gain.setValueAtTime(0.0001, t);
+        env.gain.exponentialRampToValueAtTime(amp * 0.34, t + 0.05);
+        env.gain.setTargetAtTime(amp * 0.27, t + 0.05, 0.2);
+        return { stops, tc: 0.1 };
+      }
+      case 'square': {
+        // A plain square wave, no wobble, flat while held, and it stops
+        // almost at once when let go. A gentle filter rounds off the
+        // piercing top end (capped so high notes don't get shrill).
+        const filt = ctx.createBiquadFilter();
+        filt.type = 'lowpass';
+        filt.Q.value = 0.5;
+        filt.frequency.value = Math.min(3800, Math.max(1500, f * 7));
+        filt.connect(env);
+        osc('square', f, 1, filt);
+        env.gain.setValueAtTime(0.0001, t);
+        env.gain.exponentialRampToValueAtTime(amp * 0.14, t + 0.003);
+        return { stops, tc: 0.025 };
       }
       default: {
         // soft electric-piano-ish sound used while the piano samples load

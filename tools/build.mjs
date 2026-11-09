@@ -44,7 +44,9 @@ const PRECACHE = ${JSON.stringify(['./', ...files.map((f) => './' + f)], null, 2
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE)
-      .then((cache) => cache.addAll(PRECACHE))
+      // cache: 'reload' skips the browser's HTTP cache, so a new version never
+      // stores a stale copy of a file (GitHub Pages caches files for 10 min)
+      .then((cache) => cache.addAll(PRECACHE.map((u) => new Request(u, { cache: 'reload' }))))
       .then(() => self.skipWaiting()),
   );
 });

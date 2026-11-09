@@ -2,7 +2,7 @@
 
 import { h, clear, isTypingTarget } from './core/util.js';
 import { Store } from './core/store.js';
-import { AudioEngine } from './core/audio.js';
+import { AudioEngine, INSTRUMENTS } from './core/audio.js';
 import { InputBus, MidiInput, attachComputerKeys } from './core/input.js';
 import { PianoKeyboard } from './core/keyboard.js';
 import { icon } from './ui/icons.js';
@@ -429,7 +429,10 @@ async function boot() {
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => app.applyTheme());
   audio.volume = store.getLocal('volume') ?? 0.85;
   audio.sfxOn = store.settings.sfx;
-  audio.instrument = store.settings.instrument || 'piano';
+  // a sound that was tried and later removed (e.g. 'buzz') falls back to Square
+  const inst = store.settings.instrument || 'piano';
+  audio.instrument = INSTRUMENTS.some((i) => i.id === inst) ? inst : 'square';
+  if (audio.instrument !== inst) store.set('instrument', audio.instrument);
   buildShell();
   wireInput();
 
